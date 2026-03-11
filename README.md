@@ -15,12 +15,12 @@ Here is the refined English version of your README.md framework, now including a
 ```Plaintext
 CytoSkel3D/
 ├── CytoSkelFEx/              # Core Algorithmic Package
+│   ├── information/          # Image metadata and processing log management
 │   ├── preprocess/           # Image enhancement, filtering, and skeletonization
 │   ├── analysis/             # Graph reconstruction and hierarchical feature extraction
 │   │   ├── NetworkReconstructor.py # Super-node clustering and topological optimization
 │   │   ├── FeatureExtractor.py    # Multi-level feature scheduling core
 │   │   └── ...               # Sub-modules for Node, Segment, Branch, and Cell levels
-│   ├── information/          # Image metadata and processing log management
 │   └── synthetic/            # Synthetic data generation for benchmarking
 ├── Demo/                     # Application scripts and use cases
 ├── environment.yml           # Conda environment configuration
