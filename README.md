@@ -1,5 +1,3 @@
-Here is the refined English version of your README.md framework, now including all four sub-folders within the CytoSkel3D core package and aligned with the latest logic of your manuscript.
-
 ### CytoSkel3D: A Hierarchical Graph-Theoretical Framework for 3D Cytoskeletal Quantification
 ## Overview
 **CytoSkel3D** is a highly automated computational framework designed for the systematic quantification of complex three-dimensional (3D) cytoskeletal networks (e.g., actin, microtubules, and keratin). By overcoming the topological distortions inherent in traditional 2D projections, CytoSkel3D establishes a standardized dual-axis feature set that transforms raw volumetric data into 171 interpretable metrics across multiple structural scales and functional dimensions.
@@ -14,7 +12,7 @@ Here is the refined English version of your README.md framework, now including a
 ## Repository Structure
 ```Plaintext
 CytoSkel3D/
-├── CytoSkelFEx/              # Core Algorithmic Package
+├── CytoSkel3D/              # Core Algorithmic Package
 │   ├── information/          # Image metadata and processing log management
 │   ├── preprocess/           # Image enhancement, filtering, and skeletonization
 │   ├── analysis/             # Graph reconstruction and hierarchical feature extraction
@@ -41,11 +39,11 @@ python Demo/download_hipsc.py
 python Demo/run_edge_nonedge.py 
 ```
 ### Methodology
-**Preprocessing**: Adaptive SNR-driven filtering and ridge-based tubular enhancement ensure robust skeleton extraction.
+**Preprocessing and Skeleton Extraction**: Adaptive SNR-driven filtering and ridge-based tubular enhancement ensure robust skeleton extraction.
 
 **Topology Reconstruction**: A super-node mechanism consolidates fragmented junctions, followed by angle-guided optimization to ensure biological plausibility.
 
-**Hierarchical Extraction**:
+**Feature Extraction**:
 
 - **Node**: Junction connectivity and spatial positioning.
 - **Segment**: Micro-filament geometry (curvature, tortuosity) and 3D orientation.
@@ -56,4 +54,4 @@ python Demo/run_edge_nonedge.py
 ### Citation
 If you use CytoSkel3D in your research, please cite:
 
-XXX, et al. "CytoSkel3D: A Graph Theory-Based Framework for the Hierarchical Quantification of 3D Cytoskeletal Topology" (2026).
+Zhou, Z., et al. CytoSkel3D: A Graph-Theoretical Framework for the Hierarchical Quantification of 3D Cytoskeletal Topology. *Manuscript in preparation*.
