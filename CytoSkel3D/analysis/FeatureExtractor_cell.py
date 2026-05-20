@@ -273,10 +273,10 @@ class CellFeatureCalculator:
         bin_count = radial_features.get('actual_bin_count', 4)
         for i in range(bin_count):
             # Radial intensity distribution features
-            spatial_data[f'frac_at_d_bin{i}'] = radial_features.get(f'frac_at_d_bin{i}', np.nan)  # Fraction of intensity within the bin; quantifies the distribution proportion of proteins in a specific radial region
-            spatial_data[f'mean_frac_bin{i}'] = radial_features.get(f'mean_frac_bin{i}', np.nan)  # Standardized mean intensity; quantifies the concentration of proteins in a specific radial region (correcting for area impact)
-            spatial_data[f'radial_cv_bin{i}'] = radial_features.get(f'radial_cv_bin{i}', np.nan)  # Radial coefficient of variation; quantifies the directional variation of proteins in a specific radial region
-            spatial_data[f'carip_bin{i}'] = radial_features.get(f'carip_bin{i}', np.nan)  # Cumulative radial intensity distribution; quantifies the cumulative distribution proportion of proteins from center to edge
+            spatial_data[f'RIF_bin{i}'] = radial_features.get(f'RIF_bin{i}', np.nan)  # Fraction of intensity within the bin; quantifies the distribution proportion of proteins in a specific radial region
+            spatial_data[f'RIE_bin{i}'] = radial_features.get(f'RIE_bin{i}', np.nan)  # Standardized mean intensity; quantifies the concentration of proteins in a specific radial region (correcting for area impact)
+            spatial_data[f'RAH_bin{i}'] = radial_features.get(f'RAH_bin{i}', np.nan)  # Radial coefficient of variation; quantifies the directional variation of proteins in a specific radial region
+            spatial_data[f'CRIP_bin{i}'] = radial_features.get(f'CRIP_bin{i}', np.nan)  # Cumulative radial intensity distribution; quantifies the cumulative distribution proportion of proteins from center to edge
 
 
         # Dynamically add direction-dependent features
@@ -285,11 +285,11 @@ class CellFeatureCalculator:
         # Add sector features (for each bin and each sector)
         for bin_idx in range(bin_count):
             for sector_idx in range(sector_count):
-                spatial_data[f'bin{bin_idx}_sector{sector_idx}_frac_at_d'] = radial_features.get(
-                    f'bin{bin_idx}_sector{sector_idx}_frac_at_d', np.nan
+                spatial_data[f'bin{bin_idx}_sector{sector_idx}_RIF'] = radial_features.get(
+                    f'bin{bin_idx}_sector{sector_idx}_RIF', np.nan
                 )  # Sector intensity fraction; quantifies the distribution proportion of proteins in a specific radial region and angular sector
-                spatial_data[f'bin{bin_idx}_sector{sector_idx}_mean_frac'] = radial_features.get(
-                    f'bin{bin_idx}_sector{sector_idx}_mean_frac', np.nan
+                spatial_data[f'bin{bin_idx}_sector{sector_idx}_RIE'] = radial_features.get(
+                    f'bin{bin_idx}_sector{sector_idx}_RIE', np.nan
                 )  # Sector standardized mean intensity; quantifies the concentration of proteins in a specific radial region and angular sector (correcting for area impact)
 
 
@@ -582,7 +582,7 @@ class CellFeatureCalculator:
         }
 
     def _calculate_radial_intensity_distribution(self, cell, bin_count=4, wants_scaled=True, maximum_radius=100):
-        """Calculate cell radial intensity distribution features (FracAtD, MeanFrac, RadialCV, CARIP)"""
+        """Calculate cell radial intensity distribution features (RIF, RIE, RAH, CRIP)"""
         radial_data = {'actual_bin_count': bin_count}
         obj_mask = cell['obj_mask']
         raw_image = cell['raw_image']
@@ -663,7 +663,7 @@ class CellFeatureCalculator:
             regions = measure.regionprops(obj_mask.astype(int))
             orientation_angle = regions.orientation if regions else 0
 
-        # === 6. Calculate CARIP features ===
+        # === 6. Calculate CRIP features ===
         # Sort all pixels by distance
         sorted_indices = np.argsort(d_from_center[obj_mask])
         sorted_intensities = raw_image[obj_mask][sorted_indices]
@@ -673,8 +673,8 @@ class CellFeatureCalculator:
         bin_edges = np.linspace(0, len(sorted_indices), bin_count + 1).astype(int)
         for i in range(bin_count):
             bin_intensity = np.sum(sorted_intensities[bin_edges[i]:bin_edges[i + 1]])
-            carip = (bin_intensity / total_intensity) if total_intensity > 0 else 0
-            radial_data[f'carip_bin{i}'] = carip
+            CRIP = (bin_intensity / total_intensity) if total_intensity > 0 else 0
+            radial_data[f'CRIP_bin{i}'] = CRIP
 
         # === 7. Bin assignment ===
         bin_indexes = (normalized_distance * bin_count).astype(int)
@@ -690,9 +690,9 @@ class CellFeatureCalculator:
         global_mean = total_intensity / total_pixels if total_pixels > 0 else 0
 
         # === 9. Initialize result arrays ===
-        frac_at_d = np.full(bin_count + 1, np.nan)  # +1 for overflow bin
-        mean_frac = np.full(bin_count + 1, np.nan)  # MeanFrac = (mean intensity in bin)/(global mean intensity)
-        radial_cv = np.full(bin_count + 1, np.nan)
+        RIF = np.full(bin_count + 1, np.nan)  # +1 for overflow bin
+        RIE = np.full(bin_count + 1, np.nan)  # RIE = (mean intensity in bin)/(global mean intensity)
+        RAH = np.full(bin_count + 1, np.nan)
 
         # === 10. Calculate features for each bin ===
         for bin_idx in range(bin_count + 1):  # Including overflow bin
@@ -706,24 +706,24 @@ class CellFeatureCalculator:
             # a. Calculate total intensity within bin
             bin_intensity = np.sum(raw_image[bin_mask])
 
-            # b. Calculate FracAtD (Intensity proportion within bin)
+            # b. Calculate RIF (Radial Intensity Fraction within radial bin)
             if total_intensity > 0:
-                frac_at_d[bin_idx] = bin_intensity / total_intensity
+                RIF[bin_idx] = bin_intensity / total_intensity
             else:
-                frac_at_d[bin_idx] = 0
+                RIF[bin_idx] = 0
 
-            # c. Calculate MeanFrac (Standardized mean intensity)
+            # c. Calculate RIE (Radial Intensity Enrichment within radial bin)
             bin_mean = bin_intensity / bin_pixels if bin_pixels > 0 else 0
             if global_mean > 0:
-                mean_frac[bin_idx] = bin_mean / global_mean
+                RIE[bin_idx] = bin_mean / global_mean
             else:
-                mean_frac[bin_idx] = 0
+                RIE[bin_idx] = 0
 
-            # d. Calculate RadialCV (Intensity coefficient of variation within bin)
+            # d. Calculate RAH (Radial Angular Heterogeneity within radial bin)
             # Get all points in bin
             points = np.argwhere(bin_mask)
             if len(points) == 0:
-                radial_cv[bin_idx] = np.nan
+                RAH[bin_idx] = np.nan
                 continue
 
             intensities = raw_image[bin_mask]
@@ -816,9 +816,9 @@ class CellFeatureCalculator:
             valid_means = [m for m in sector_means if m > 0]
             if len(valid_means) >= 2:
                 mean_val = np.mean(valid_means)
-                radial_cv[bin_idx] = np.std(valid_means) / mean_val
+                RAH[bin_idx] = np.std(valid_means) / mean_val
             else:
-                radial_cv[bin_idx] = 0  # Avoid returning nan
+                RAH[bin_idx] = 0  # Avoid returning nan
 
             # Direction-dependent features - calculated per sector
             sector_count = 8 if is_3d else 4
@@ -844,26 +844,26 @@ class CellFeatureCalculator:
                     else:
                         sector_frac = 0
 
-                    radial_data[f'bin{bin_idx}_sector{sector_idx}_frac_at_d'] = sector_frac
+                    radial_data[f'bin{bin_idx}_sector{sector_idx}_RIF'] = sector_frac
 
                     # Sector standardized mean intensity
                     sector_pixels = np.sum(sector_mask)
                     if sector_pixels > 0 and bin_pixels > 0:
-                        radial_data[f'bin{bin_idx}_sector{sector_idx}_mean_frac'] = sector_frac / (
+                        radial_data[f'bin{bin_idx}_sector{sector_idx}_RIE'] = sector_frac / (
                                     sector_pixels / bin_pixels)
                     else:
-                        radial_data[f'bin{bin_idx}_sector{sector_idx}_mean_frac'] = 0
+                        radial_data[f'bin{bin_idx}_sector{sector_idx}_RIE'] = 0
 
-        # === 11. Store FracAtD and MeanFrac results ===
+        # === 11. Store RIF and RIE results ===
         for bin_idx in range(bin_count):
-            radial_data[f'frac_at_d_bin{bin_idx}'] = frac_at_d[bin_idx]
-            radial_data[f'mean_frac_bin{bin_idx}'] = mean_frac[bin_idx]
-            radial_data[f'radial_cv_bin{bin_idx}'] = radial_cv[bin_idx]
+            radial_data[f'RIF_bin{bin_idx}'] = RIF[bin_idx]
+            radial_data[f'RIE_bin{bin_idx}'] = RIE[bin_idx]
+            radial_data[f'RAH_bin{bin_idx}'] = RAH[bin_idx]
 
         # Handle overflow bin
         if not wants_scaled:
-            radial_data[f'frac_at_d_overflow'] = frac_at_d[bin_count]
-            radial_data[f'mean_frac_overflow'] = mean_frac[bin_count]
-            radial_data[f'radial_cv_overflow'] = radial_cv[bin_count]
+            radial_data[f'RIF_overflow'] = RIF[bin_count]
+            radial_data[f'RIE_overflow'] = RIE[bin_count]
+            radial_data[f'RAH_overflow'] = RAH[bin_count]
 
         return radial_data
