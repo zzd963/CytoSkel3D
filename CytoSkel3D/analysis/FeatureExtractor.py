@@ -73,6 +73,7 @@ class FeatureExtractor:
         self.obj_mask = obj_mask
         self.params = params if params else {}
         self.full_image_mode = full_image_mode
+        self.bin_count = self.params.get('bin_count', 4)
 
         # 2. Basic configuration and property calculation
         self.layer_select = layer_select if layer_select else ['nodes', 'segments', 'branches', 'network', 'cell']
@@ -650,7 +651,7 @@ class FeatureExtractor:
                     if len(coord) == 3:  # (z,y,x) format
                         coord_arr = np.array(coord)
                     else:  # (y,x) format
-                        coord_arr = np.array([0, coord, coord])
+                        coord_arr = np.array([0, coord[0], coord[1]])
                 weighted_centroid_voxel += coord_arr * intensities[i]
             weighted_centroid_voxel /= total_intensity
 
@@ -660,7 +661,7 @@ class FeatureExtractor:
             )
         else:
             features['Location_CenterMassIntensity_um'] = self._to_physical_coordinates(
-                voxel_coords) if voxel_coords else (np.nan, np.nan, np.nan)
+                voxel_coords[0]) if voxel_coords else (np.nan, np.nan, np.nan)
 
         # Center of mass displacement (physical units)
         if voxel_coords and len(voxel_coords) > 0:
@@ -678,7 +679,7 @@ class FeatureExtractor:
                         coords_2d.append(coord)
                 binary_centroid_voxel = np.mean(coords_2d, axis=0)
                 # Add z dimension
-                binary_centroid_voxel = np.array([0, binary_centroid_voxel, binary_centroid_voxel])
+                binary_centroid_voxel = np.array([0, binary_centroid_voxel[0], binary_centroid_voxel[1]])
 
             # Convert to physical coordinates
             binary_centroid_phy = self._to_physical_coordinates(binary_centroid_voxel)
@@ -710,7 +711,7 @@ class FeatureExtractor:
         if len(path) < 2:
             return np.zeros(3) if self.is_3d else np.zeros(2)
 
-        start = np.array(self._to_physical_coordinates(path))
+        start = np.array(self._to_physical_coordinates(path[0]))
         end = np.array(self._to_physical_coordinates(path[-1]))
 
         vector = end - start
@@ -731,7 +732,7 @@ class FeatureExtractor:
         oot_mean = np.mean(oot_all, axis=0)
 
         # 3D anisotropy tensor
-        n_features = directions.shape
+        n_features = directions.shape[1]
         oot = 1.5 * (oot_mean - np.eye(n_features) / n_features)
         eigenvalues = np.linalg.eigvalsh(oot)
         return np.max(eigenvalues)
@@ -755,7 +756,7 @@ class FeatureExtractor:
             pca.fit(phys_coords)
 
             # Get main direction vector (first principal component)
-            main_direction = pca.components_
+            main_direction = pca.components_[0]
 
             # Calculate azimuth angle (XY plane angle)
             dx, dy, dz = main_direction
@@ -765,11 +766,11 @@ class FeatureExtractor:
             regions = measure.regionprops(obj_mask.astype(int))
             if not regions:
                 return 0.0
-            return regions.orientation  # Return radians
+            return regions[0].orientation  # Return radians
 
     def _to_physical_coordinates(self, input_data):
         """Coordinate conversion (migrated from Analyzer)"""
-        if isinstance(input_data, (tuple, list, np.ndarray)) and not isinstance(input_data,
+        if isinstance(input_data, (tuple, list, np.ndarray)) and not isinstance(input_data[0],
                                                                                 (tuple, list, np.ndarray)):
             return self._convert_single_point(input_data)
         return [self._convert_single_point(point) for point in input_data]
@@ -779,12 +780,12 @@ class FeatureExtractor:
         if len(point) == 3:
             z, y, x = point
             if self.is_3d:
-                return (z * self.voxel_size, y * self.voxel_size, x * self.voxel_size)
+                return (z * self.voxel_size[0], y * self.voxel_size[1], x * self.voxel_size[2])
             else:
-                return (0.0, y * self.voxel_size, x * self.voxel_size)
+                return (0.0, y * self.voxel_size[0], x * self.voxel_size[1])
         elif len(point) == 2:
             y, x = point
-            return (0.0, y * self.voxel_size, x * self.voxel_size)
+            return (0.0, y * self.voxel_size[0], x * self.voxel_size[1])
         return (0.0, 0.0, 0.0)
 
     def _calculate_physical_path_length(self, physical_path):

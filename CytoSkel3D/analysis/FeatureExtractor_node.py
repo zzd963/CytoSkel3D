@@ -49,9 +49,9 @@ class NodeFeatureCalculator:
             coord = np.array(node['coord'])
             if self.extractor.is_3d:
                 feat_dict.update({
-                    'z_um': coord,
-                    'y_um': coord,
-                    'x_um': coord
+                    'z_um': coord[0],
+                    'y_um': coord[1],
+                    'x_um': coord[2]
                 })
             else:
                 if len(coord) == 3:  # (z,y,x) format but 2D
@@ -207,7 +207,7 @@ class NodeFeatureCalculator:
                 if self.extractor.is_3d:
                     # Directly use voxel coordinates (pixel coordinates)
                     voxel_coord = np.round(coord).astype(int)
-                    voxel_coord = np.clip(voxel_coord,, np.array(surface_edt.shape) - 1)
+                    voxel_coord = np.clip(voxel_coord, [0, 0, 0], np.array(surface_edt.shape) - 1)
                     to_surface_dist = surface_edt[tuple(voxel_coord)]
                 else:
                     if len(coord) == 3:  # (z,y,x) format
@@ -216,7 +216,7 @@ class NodeFeatureCalculator:
                         y, x = coord
                     # Directly use voxel coordinates (pixel coordinates)
                     voxel_coord = np.round(np.array([y, x])).astype(int)
-                    voxel_coord = np.clip(voxel_coord,, np.array(surface_edt.shape) - 1)
+                    voxel_coord = np.clip(voxel_coord, [0, 0], np.array(surface_edt.shape) - 1)
                     to_surface_dist = surface_edt[tuple(voxel_coord)]
             spatial_data['to_surface_dist'].append(to_surface_dist)
 
@@ -272,9 +272,9 @@ class NodeFeatureCalculator:
                     for dy in range(-1, 2):
                         for dx in range(-1, 2):
                             nz, ny, nx = z + dz, y + dy, x + dx
-                            if (0 <= nz < self.extractor.raw_image.shape and
-                                    0 <= ny < self.extractor.raw_image.shape and
-                                    0 <= nx < self.extractor.raw_image.shape):
+                            if (0 <= nz < self.extractor.raw_image.shape[0] and
+                                    0 <= ny < self.extractor.raw_image.shape[1] and
+                                    0 <= nx < self.extractor.raw_image.shape[2]):
                                 points.append((nz, ny, nx))
             else:
                 # 2D image: 3x3 region
@@ -285,8 +285,8 @@ class NodeFeatureCalculator:
                 for dy in range(-1, 2):
                     for dx in range(-1, 2):
                         ny, nx = y + dy, x + dx
-                        if (0 <= ny < self.extractor.raw_image.shape and
-                                0 <= nx < self.extractor.raw_image.shape):
+                        if (0 <= ny < self.extractor.raw_image.shape[0] and
+                                0 <= nx < self.extractor.raw_image.shape[1]):
                             points.append((ny, nx))
 
             # Use unified method to calculate intensity features (pass pixel coordinates)

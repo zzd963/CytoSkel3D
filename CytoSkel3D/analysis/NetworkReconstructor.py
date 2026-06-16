@@ -145,7 +145,7 @@ class NetworkReconstructor:
             candidate_merges.append((dist, ep1, ep2))
 
         # Sort by distance, prioritize connecting the closest ones
-        candidate_merges.sort(key=lambda x: x)
+        candidate_merges.sort(key=lambda x: x[0])
 
         current_segments = segments.copy()
         processed_pairs = set()
@@ -236,7 +236,7 @@ class NetworkReconstructor:
         point_arr = np.array(point)
 
         # Check start point
-        dist_start = np.linalg.norm(path - point_arr)
+        dist_start = np.linalg.norm(path[0] - point_arr)
         if dist_start < 1e-3: return 0
 
         # Check end point
@@ -264,7 +264,7 @@ class NetworkReconstructor:
         path_arr = np.asarray(path, dtype=np.float64)
 
         window = min(5, len(path_arr) - 1)
-        p_base = path_arr if is_start else path_arr[-1]
+        p_base = path_arr[0] if is_start else path_arr[-1]
 
         vec_sum = np.zeros(len(p_base), dtype=float)
         count = 0
@@ -353,7 +353,7 @@ class NetworkReconstructor:
         ))
 
         return {
-            'start_point': tuple(merged_path),
+            'start_point': tuple(merged_path[0]),
             'end_point': tuple(merged_path[-1]),
             'path': merged_path,
             'label': seg1.get('label', 0),  # Inherit label
@@ -387,8 +387,8 @@ class NetworkReconstructor:
 
         if len(bridge_path) > 0:
             # Check if bridge contains endpoints to avoid duplication
-            start_overlap = np.linalg.norm(bridge_path - path1[-1]) < 1e-3
-            end_overlap = np.linalg.norm(bridge_path[-1] - path2) < 1e-3
+            start_overlap = np.linalg.norm(bridge_path[0] - path1[-1]) < 1e-3
+            end_overlap = np.linalg.norm(bridge_path[-1] - path2[0]) < 1e-3
 
             b_start = 1 if start_overlap else 0
             b_end = -1 if (end_overlap and len(bridge_path) > 1) else None
@@ -405,7 +405,7 @@ class NetworkReconstructor:
         ))
 
         return {
-            'start_point': tuple(merged_path),
+            'start_point': tuple(merged_path[0]),
             'end_point': tuple(merged_path[-1]),
             'path': merged_path,
             'label': seg1.get('label', 0),

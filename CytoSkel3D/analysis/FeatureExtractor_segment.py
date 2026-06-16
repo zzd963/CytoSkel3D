@@ -71,7 +71,7 @@ class SegmentFeatureCalculator:
             for prop_idx, props in enumerate(properties_list):
                 if 'path' in props and len(props['path']) > 1:
                     # Create an enhanced edge_key containing the segment index
-                    enhanced_key = (edge_key, edge_key, prop_idx)
+                    enhanced_key = (edge_key[0], edge_key[1], prop_idx)
 
                     segments.append({
                         'id': segment_id,
@@ -105,7 +105,7 @@ class SegmentFeatureCalculator:
 
             # 2. Calculate physical straight-line distance directly
             if len(path) >= 2:
-                start_phy = self.extractor._to_physical_coordinates(path)
+                start_phy = self.extractor._to_physical_coordinates(path[0])
                 end_phy = self.extractor._to_physical_coordinates(path[-1])
                 straight_length_um = np.linalg.norm(np.array(end_phy) - np.array(start_phy))
             else:
@@ -277,7 +277,7 @@ class SegmentFeatureCalculator:
         ])
 
         # Calculate segment direction vector (from start to end point)
-        start = np.array(self.extractor._to_physical_coordinates(path))
+        start = np.array(self.extractor._to_physical_coordinates(path[0]))
         end = np.array(self.extractor._to_physical_coordinates(path[-1]))
         vec = end - start
         length = np.linalg.norm(vec)
@@ -288,12 +288,12 @@ class SegmentFeatureCalculator:
         # Take XY plane components
         if self.extractor.is_3d:
             # Note: in 3D, the order of physical coordinates is [z_phy, y_phy, x_phy]
-            dy, dx = vec, vec
+            dy, dx = vec[1], vec[2]
         else:
             if len(vec) == 3:  # (0, y, x)
-                dy, dx = vec, vec
+                dy, dx = vec[1], vec[2]
             else:  # (y, x)
-                dy, dx = vec, vec
+                dy, dx = vec[0], vec[1]
 
         # Calculate segment direction vector (normalized)
         filament_vector = np.array([dx, dy])
@@ -315,7 +315,7 @@ class SegmentFeatureCalculator:
             return np.nan
 
         # Calculate segment direction vector
-        start = np.array(self.extractor._to_physical_coordinates(path))
+        start = np.array(self.extractor._to_physical_coordinates(path[0]))
         end = np.array(self.extractor._to_physical_coordinates(path[-1]))
         vec = end - start
         length = np.linalg.norm(vec)
@@ -324,7 +324,7 @@ class SegmentFeatureCalculator:
             return np.nan
 
         # In 3D, the order of physical coordinates is [z_phy, y_phy, x_phy], so the Z component is vec
-        dz = vec
+        dz = vec[0]
         # Calculate angle with Z-axis
         cos_phi = dz / length
         cos_phi = np.clip(cos_phi, -1.0, 1.0)
@@ -376,7 +376,7 @@ class SegmentFeatureCalculator:
                 area = np.linalg.norm(cross) / 2.0
             else:
                 # 2D cross product is a scalar
-                area = abs(v1 * v2 - v1 * v2) / 2.0
+                area = abs(v1[0] * v2[1] - v1[1] * v2[0]) / 2.0
 
             # Curvature = 4 * area / (chord length ^ 3)
             curvature = 4 * area / (chord ** 3) if chord > 0 else np.nan
@@ -386,11 +386,11 @@ class SegmentFeatureCalculator:
                 # In 3D, we use the projection on the XY plane to determine the sign
                 v1_xy = v1[1:3]  # Take y,x components
                 v2_xy = v2[1:3]
-                cross_z = v1_xy * v2_xy - v1_xy * v2_xy
+                cross_z = v1_xy[0] * v2_xy[1] - v1_xy[1] * v2_xy[0]
                 sign = np.sign(cross_z)
             else:
                 # 2D directly takes the sign of the cross product
-                cross_z = v1 * v2 - v1 * v2
+                cross_z = v1[0] * v2[1] - v1[1] * v2[0]
                 sign = np.sign(cross_z)
 
             curvatures['unsigned'].append(abs(curvature))
@@ -407,7 +407,7 @@ class SegmentFeatureCalculator:
         phys_path = [self.extractor._to_physical_coordinates(p) for p in path]
 
         # Get physical coordinates of endpoints
-        start = np.array(phys_path)
+        start = np.array(phys_path[0])
         end = np.array(phys_path[-1])
 
         # Calculate vector connecting the endpoints
@@ -436,7 +436,7 @@ class SegmentFeatureCalculator:
                     line_vector_2d = line_vector
 
                 # 2D cross product is a scalar: v_x * line_y - v_y * line_x
-                cross = v * line_vector_2d - v * line_vector_2d
+                cross = v[0] * line_vector_2d[1] - v[1] * line_vector_2d[0]
                 dist = abs(cross) / line_length
 
             distances.append(dist)

@@ -186,12 +186,12 @@ class CytoskeletonNetworkAnalyzer:
                 super_coord = center_index
                 for coord in cluster_coords:
                     self.super_nodes_map[tuple(coord)] = super_coord
-                super_nodes.append((super_coord, super_coord, super_coord, 'super_branchpoint'))
+                super_nodes.append((super_coord[0], super_coord[1], super_coord[2], 'super_branchpoint'))
             else:
-                super_coord = (center_index, center_index)
+                super_coord = (center_index[1], center_index[2])
                 for coord in cluster_coords:
-                    self.super_nodes_map[(coord, coord)] = super_coord
-                super_nodes.append((super_coord, super_coord, 'super_branchpoint'))
+                    self.super_nodes_map[(coord[1], coord[2])] = super_coord
+                super_nodes.append((super_coord[0], super_coord[1], 'super_branchpoint'))
 
         return super_nodes
 
@@ -222,14 +222,14 @@ class CytoskeletonNetworkAnalyzer:
             for point in path:
                 if self.is_3d:
                     z, y, x = point
-                    z_start, z_end = max(z - 1, 0), min(z + 2, self.skeleton.shape)
-                    y_start, y_end = max(y - 1, 0), min(y + 2, self.skeleton.shape)
-                    x_start, x_end = max(x - 1, 0), min(x + 2, self.skeleton.shape)
+                    z_start, z_end = max(z - 1, 0), min(z + 2, self.skeleton.shape[0])
+                    y_start, y_end = max(y - 1, 0), min(y + 2, self.skeleton.shape[1])
+                    x_start, x_end = max(x - 1, 0), min(x + 2, self.skeleton.shape[2])
                     neighborhood = temp_skeleton[z_start:z_end, y_start:y_end, x_start:x_end]
                 else:
                     z, y, x = point
-                    y_start, y_end = max(y - 1, 0), min(y + 2, self.skeleton.shape)
-                    x_start, x_end = max(x - 1, 0), min(x + 2, self.skeleton.shape)
+                    y_start, y_end = max(y - 1, 0), min(y + 2, self.skeleton.shape[1])
+                    x_start, x_end = max(x - 1, 0), min(x + 2, self.skeleton.shape[2])
                     neighborhood = temp_skeleton[0, y_start:y_end, x_start:x_end]
 
                 skeleton_neighbors = np.sum(neighborhood) - 1
@@ -250,9 +250,9 @@ class CytoskeletonNetworkAnalyzer:
                         for dy in (-1, 0, 1):
                             for dx in (-1, 0, 1):
                                 nz, ny, nx = z + dz, y + dy, x + dx
-                                if (0 <= nz < self.skeleton.shape and
-                                        0 <= ny < self.skeleton.shape and
-                                        0 <= nx < self.skeleton.shape and
+                                if (0 <= nz < self.skeleton.shape[0] and
+                                        0 <= ny < self.skeleton.shape[1] and
+                                        0 <= nx < self.skeleton.shape[2] and
                                         self.pixel_class[nz, ny, nx] == 4):
                                     orig_coord = (nz, ny, nx)
                                     super_coord = self.super_nodes_map.get(orig_coord, orig_coord)
@@ -263,22 +263,22 @@ class CytoskeletonNetworkAnalyzer:
                     for dy in (-1, 0, 1):
                         for dx in (-1, 0, 1):
                             ny, nx = y + dy, x + dx
-                            if (0 <= ny < self.skeleton.shape and
-                                    0 <= nx < self.skeleton.shape and
+                            if (0 <= ny < self.skeleton.shape[1] and
+                                    0 <= nx < self.skeleton.shape[2] and
                                     self.pixel_class[0, ny, nx] == 4):
                                 orig_coord = (0, ny, nx)
                                 orig_2d = (ny, nx)
                                 super_coord = self.super_nodes_map.get(orig_2d, orig_2d)
                                 if len(super_coord) == 2:
-                                    super_coord_3d = (0, super_coord, super_coord)
+                                    super_coord_3d = (0, super_coord[0], super_coord[1])
                                 else:
                                     super_coord_3d = super_coord
                                 connected_original_bps.append(orig_coord)
                                 connected_super_nodes.append(super_coord_3d)
 
             seg_data = {
-                'start_point': endpoints,
-                'end_point': endpoints,
+                'start_point': endpoints[0],
+                'end_point': endpoints[1],
                 'path': path,
                 'label': region.label,
                 'connected_original_bps': list(set(connected_original_bps)),
@@ -390,7 +390,7 @@ class CytoskeletonNetworkAnalyzer:
                 node_id_map[point_tuple] = node_id
                 phys_coord = self._to_physical_coordinates(point)
                 node_type = 'branchpoint' if point in self.original_branchpoints else 'endpoint'
-                self.graph.add_node(node_id, z=phys_coord, y=phys_coord, x=phys_coord,
+                self.graph.add_node(node_id, z=phys_coord[0], y=phys_coord[1], x=phys_coord[2],
                                     pos=phys_coord, type=node_type)
                 self.centroids[node_id] = phys_coord
                 next_node_id += 1
@@ -413,7 +413,7 @@ class CytoskeletonNetworkAnalyzer:
                     node_id_map[point_tuple] = node_id
                     phys_coord = self._to_physical_coordinates(point)
                     node_type = 'branchpoint' if point in self.original_branchpoints else 'endpoint'
-                    self.graph.add_node(node_id, z=phys_coord, y=phys_coord, x=phys_coord,
+                    self.graph.add_node(node_id, z=phys_coord[0], y=phys_coord[1], x=phys_coord[2],
                                         pos=phys_coord, type=node_type)
                     self.centroids[node_id] = phys_coord
                     next_node_id += 1
@@ -457,7 +457,7 @@ class CytoskeletonNetworkAnalyzer:
 
     def _calculate_physical_distance(self, pos1, pos2):
         pos1_phy, pos2_phy = self._to_physical_coordinates(pos1), self._to_physical_coordinates(pos2)
-        dx, dy, dz = pos2_phy - pos1_phy, pos2_phy - pos1_phy, pos2_phy - pos1_phy
+        dx, dy, dz = pos2_phy[2] - pos1_phy[2], pos2_phy[1] - pos1_phy[1], pos2_phy[0] - pos1_phy[0]
         return np.sqrt(dx ** 2 + dy ** 2 + dz ** 2)
 
     def _calculate_edge_capacity(self, data, path_length):
@@ -470,7 +470,7 @@ class CytoskeletonNetworkAnalyzer:
                     z, y, x = map(int, point[:3])
                     intensities.append(self.raw_image[z, y, x])
                 else:
-                    z, y, x = point if len(point) == 3 else (0, point, point)
+                    z, y, x = point if len(point) == 3 else (0, point[0], point[1])
                     intensities.append(self.raw_image[y, x])
             except (IndexError, ValueError):
                 continue
@@ -478,7 +478,7 @@ class CytoskeletonNetworkAnalyzer:
         return avg_intensity / max(path_length, 1e-6)
 
     def _to_physical_coordinates(self, input_data):
-        if isinstance(input_data, (tuple, list, np.ndarray)) and not isinstance(input_data,
+        if isinstance(input_data, (tuple, list, np.ndarray)) and not isinstance(input_data[0],
                                                                                 (tuple, list, np.ndarray)):
             return self._convert_single_point(input_data)
         return [self._convert_single_point(point) for point in input_data]
@@ -486,10 +486,10 @@ class CytoskeletonNetworkAnalyzer:
     def _convert_single_point(self, point):
         if len(point) == 3:
             z, y, x = point
-            return (z * self.voxel_size, y * self.voxel_size, x * self.voxel_size)
+            return (z * self.voxel_size[0], y * self.voxel_size[1], x * self.voxel_size[2])
         elif len(point) == 2:
             y, x = point
-            return (0.0, y * self.voxel_size, x * self.voxel_size)
+            return (0.0, y * self.voxel_size[1], x * self.voxel_size[2])
         return (0.0, 0.0, 0.0)
 
     def _save_intermediate_results(self, segments_bp, segments_connected, output_dir):
@@ -533,10 +533,10 @@ class CytoskeletonNetworkAnalyzer:
             for point in seg['path']:
                 if self.is_3d:
                     z, y, x = point[:3]
-                    if 0 <= z < image.shape and 0 <= y < image.shape and 0 <= x < image.shape:
+                    if 0 <= z < image.shape[0] and 0 <= y < image.shape[1] and 0 <= x < image.shape[2]:
                         image[z, y, x] = i + 1
                 else:
-                    z, y, x = point if len(point) == 3 else (0, point, point)
-                    if 0 <= y < image.shape and 0 <= x < image.shape:
+                    z, y, x = point if len(point) == 3 else (0, point[0], point[1])
+                    if 0 <= y < image.shape[0] and 0 <= x < image.shape[1]:
                         image[y, x] = i + 1
         return image

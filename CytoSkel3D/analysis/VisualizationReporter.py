@@ -12,30 +12,30 @@ from skimage import io, measure, exposure
 import traceback
 
 class VisualizationReporter:
-    """Handle network visualization and report generation"""
+    """处理网络可视化与报告生成"""
 
     def __init__(self, self_info):
-        # Store reference to main analyzer instance
+        # 存储对主分析器实例的引用
         self.analyzer = self_info.analyzer
         self.info = self_info
 
     def visualize_3d_paths(self, output_dir, obj_id):
-        """Draw complete 3D network paths"""
+        """绘制完整的3D网络路径"""
         if not self.analyzer.is_3d or len(self.analyzer.edge_properties) == 0:
             return
 
         try:
-            # Create 3D figure
+            # 创建3D图形
             fig = plt.figure(figsize=(16, 12))
             ax = fig.add_subplot(111, projection='3d')
 
-            # Set background color
+            # 设置背景色
             fig.set_facecolor('#2c3e50')
             ax.set_facecolor('#2c3e50')
 
             base_node_size = 15
 
-            # Collect capacity values of all edges to create a global color map
+            # 收集所有边的容量值用于创建全局颜色映射
             capacities = []
             for (u, v), properties_list in self.analyzer.edge_properties.items():
                 for props in properties_list:
@@ -44,68 +44,68 @@ class VisualizationReporter:
                         if np.isfinite(capacity) and capacity > 0:
                             capacities.append(capacity)
 
-            # Create color map (normalize using data from all edges)
+            # 创建颜色映射（使用所有边的数据归一化）
             if capacities:
-                # Use actual data range instead of percentiles
+                # 使用实际数据范围而不是百分位数
                 vmin = min(capacities)
                 vmax = max(capacities)
 
-                # If the data range is too small, appropriately expand the range to ensure color variation is visible
-                if vmax - vmin < 1e-5:  # All values are almost the same
+                # 如果数据范围太小，适当扩展范围以确保颜色变化可见
+                if vmax - vmin < 1e-5:  # 所有值几乎相同
                     vmin = vmin * 0.9 if vmin > 0 else 0
                     vmax = vmax * 1.1 if vmax > 0 else 1.0
 
                 norm = mpl.colors.Normalize(vmin=vmin, vmax=vmax)
                 cmap = plt.get_cmap('viridis')
                 mapper = plt.cm.ScalarMappable(norm=norm, cmap=cmap)
-                mapper.set_array([])  # Must set empty array for colorbar to use
+                mapper.set_array([])  # 必须设置空数组以供颜色条使用
             else:
-                print("Warning: No valid transport capacity values available for color mapping")
+                print("警告：没有有效的传输能力值可用于颜色映射")
                 mapper = None
 
-            # Draw all edge paths
+            # 绘制所有边路径
             for (u, v), properties_list in self.analyzer.edge_properties.items():
                 for props in properties_list:
                     if 'path' not in props:
                         continue
 
-                    # Get path and convert to pixel coordinates
+                    # 获取路径并转换为像素坐标
                     path = props['path']
                     path_pixels = self._physical_to_pixel_coordinates(path)
 
-                    # Ensure there are valid coordinate points
+                    # 确保有有效的坐标点
                     if not path_pixels:
                         continue
 
-                    zs, ys, xs = zip(*[(p, p, p) for p in path_pixels])
+                    zs, ys, xs = zip(*[(p[0], p[1], p[2]) for p in path_pixels])
 
-                    # Calculate color
+                    # 计算颜色
                     if mapper and 'capacity' in props:
                         capacity = props['capacity']
-                        # Limit to valid range
+                        # 限制在有效范围内
                         if capacity < vmin: capacity = vmin
                         if capacity > vmax: capacity = vmax
                         color = mapper.to_rgba(capacity)
                     else:
-                        color = 'cyan'  # Default color
+                        color = 'cyan'  # 默认颜色
 
-                    # Draw path
+                    # 绘制路径
                     ax.plot(xs, ys, zs,
                             color=color,
-                            linewidth=2,  # Fixed line width of 2
+                            linewidth=2,  # 固定线宽为2
                             alpha=0.7,
                             solid_capstyle='round'
                             )
 
 
-            # Collect all node positions and draw them uniformly (keep unchanged)
+            # 收集所有节点位置并统一绘制（保持不变）
             xs_n, ys_n, zs_n = [], [], []
             node_sizes = []
             for node_id, node_data in self.analyzer.graph.nodes(data=True):
                 if 'pos' in node_data:
                     pixel_coord = self._physical_to_pixel_coordinates([node_data['pos']])
                     if pixel_coord:
-                        z, y, x = pixel_coord
+                        z, y, x = pixel_coord[0]
                         xs_n.append(x)
                         ys_n.append(y)
                         zs_n.append(z)
@@ -113,7 +113,7 @@ class VisualizationReporter:
                         size = max(5, min(30, base_node_size + degree * 1.5))
                         node_sizes.append(size)
 
-            # Uniformly draw all nodes (keep unchanged)
+            # 统一绘制所有节点（保持不变）
             if xs_n and ys_n and zs_n and node_sizes:
                 ax.scatter(xs_n, ys_n, zs_n,
                            s=node_sizes,
@@ -121,37 +121,37 @@ class VisualizationReporter:
                            ec='white',
                            alpha=0.7)
 
-            # Set axis labels (keep unchanged)
-            unit_x = "X (μm)" if self.analyzer.voxel_size != 1 else "X (px)"
-            unit_y = "Y (μm)" if self.analyzer.voxel_size != 1 else "Y (px)"
-            unit_z = "Z (μm)" if self.analyzer.voxel_size != 1 else "Z (px)"
+            # 设置坐标轴标签（保持不变）
+            unit_x = "X (μm)" if self.analyzer.voxel_size[2] != 1 else "X (px)"
+            unit_y = "Y (μm)" if self.analyzer.voxel_size[1] != 1 else "Y (px)"
+            unit_z = "Z (μm)" if self.analyzer.voxel_size[0] != 1 else "Z (px)"
 
             ax.set_xlabel(unit_x)
             ax.set_ylabel(unit_y)
             ax.set_zlabel(unit_z)
 
-            # Set viewing angle
+            # 设置视角
             ax.view_init(elev=30, azim=45)
 
-            # Title
+            # 标题
             ax.set_title(f"Object {obj_id} 3D Network Paths", color='white', fontsize=14)
 
-            # Save image
+            # 保存图像
             output_path = os.path.join(output_dir, f"object_{obj_id}_3d_paths.png")
             plt.savefig(output_path, dpi=300, bbox_inches='tight')
             plt.close(fig)
 
         except Exception as e:
-            print(f"3D path visualization failed: {str(e)}")
+            print(f"3D路径可视化失败: {str(e)}")
             import traceback
             traceback.print_exc()
             plt.close('all')
 
     def visualize_network_projection(self, output_dir, obj_id, bg_img=None):
-        """Draw network path on 2D projection (XY projection)"""
+        """在2D投影上绘制网络路径（XY投影）"""
         fig, ax = plt.subplots(figsize=(12, 12))
 
-        # Set background
+        # 设置背景
         if bg_img is not None:
             ax.imshow(bg_img, cmap='gray', origin='upper')
         else:
@@ -161,10 +161,10 @@ class VisualizationReporter:
                 bg_img = self.analyzer.skeleton
             ax.imshow(bg_img, cmap='gray', origin='upper')
 
-        # Define reasonable node size
+        # 定义合理的节点大小
         base_node_size = 10
 
-        # Collect capacity values of all edges to create a global color map
+        # 收集所有边的容量值用于创建全局颜色映射
         capacities = []
         for (u, v), properties_list in self.analyzer.edge_properties.items():
             for props in properties_list:
@@ -173,26 +173,26 @@ class VisualizationReporter:
                     if np.isfinite(capacity) and capacity > 0:
                         capacities.append(capacity)
 
-        # Create color map (normalize using data from all edges)
+        # 创建颜色映射（使用所有边的数据归一化）
         if capacities:
-            # Use actual data range instead of percentiles
+            # 使用实际数据范围而不是百分位数
             vmin = min(capacities)
             vmax = max(capacities)
 
-            # If the data range is too small, appropriately expand the range to ensure color variation is visible
-            if vmax - vmin < 1e-5:  # All values are almost the same
+            # 如果数据范围太小，适当扩展范围以确保颜色变化可见
+            if vmax - vmin < 1e-5:  # 所有值几乎相同
                 vmin = vmin * 0.9 if vmin > 0 else 0
                 vmax = vmax * 1.1 if vmax > 0 else 1.0
 
             norm = mpl.colors.Normalize(vmin=vmin, vmax=vmax)
             cmap = plt.get_cmap('viridis')
             mapper = plt.cm.ScalarMappable(norm=norm, cmap=cmap)
-            mapper.set_array([])  # Must set empty array for colorbar to use
+            mapper.set_array([])  # 必须设置空数组以供颜色条使用
         else:
-            print("Warning: No valid transport capacity values available for color mapping")
+            print("警告：没有有效的传输能力值可用于颜色映射")
             mapper = None
 
-        # Draw all edge paths
+        # 绘制所有边路径
         for (u, v), properties_list in self.analyzer.edge_properties.items():
             for props in properties_list:
                 if 'path' not in props:
@@ -201,10 +201,10 @@ class VisualizationReporter:
                 path = props['path']
                 xs, ys = [], []
 
-                # Convert path from physical coordinates to pixel coordinates
+                # 将路径从物理坐标转换为像素坐标
                 path_pixels = self._physical_to_pixel_coordinates(path)
 
-                # Ensure there are valid coordinate points
+                # 确保有有效的坐标点
                 if not path_pixels:
                     continue
 
@@ -219,21 +219,21 @@ class VisualizationReporter:
                     xs.append(x)
                     ys.append(y)
 
-                # Ensure there are enough data points
+                # 确保有足够的数据点
                 if len(xs) < 2:
                     continue
 
-                # Calculate color
+                # 计算颜色
                 if mapper and 'capacity' in props:
                     capacity = props['capacity']
-                    # Limit to valid range
+                    # 限制在有效范围内
                     if capacity < vmin: capacity = vmin
                     if capacity > vmax: capacity = vmax
                     color = mapper.to_rgba(capacity)
                 else:
-                    color = 'cyan'  # Default color
+                    color = 'cyan'  # 默认颜色
 
-                # Draw path
+                # 绘制路径
                 ax.plot(xs, ys,
                         color=color,
                         linewidth=2,
@@ -241,14 +241,14 @@ class VisualizationReporter:
                         solid_capstyle='round'
                         )
 
-        # Collect all node positions and sizes
+        # 收集所有节点位置和大小
         xs, ys = [], []
         node_sizes = []
         for node_id, node_data in self.analyzer.graph.nodes(data=True):
             if 'pos' in node_data:
                 pixel_coords = self._physical_to_pixel_coordinates([node_data['pos']])
                 if pixel_coords:
-                    coord = pixel_coords
+                    coord = pixel_coords[0]
                     if self.analyzer.is_3d and len(coord) == 3:
                         z, y, x = coord
                     elif len(coord) >= 2:
@@ -263,7 +263,7 @@ class VisualizationReporter:
                     size = max(5, min(30, base_node_size + degree * 2))
                     node_sizes.append(size)
 
-        # Uniformly draw all nodes
+        # 统一绘制所有节点
         if xs and ys and node_sizes:
             ax.scatter(
                 xs, ys,
@@ -274,7 +274,7 @@ class VisualizationReporter:
                 zorder=5
             )
 
-        # Set labels
+        # 设置标签
         unit = " (px)"
         if any(v != 1 for v in self.analyzer.voxel_size):
             unit = " (μm)"
@@ -283,7 +283,7 @@ class VisualizationReporter:
         ax.set_ylabel(f"Y{unit}")
         ax.set_title(f"Object {obj_id} Network Projection", fontsize=12)
 
-        # Save image
+        # 保存图像
         output_path = os.path.join(output_dir, f"object_{obj_id}_network_projection.png")
         plt.savefig(output_path, dpi=300, bbox_inches='tight')
         plt.close(fig)
@@ -295,21 +295,21 @@ class VisualizationReporter:
             if len(point) == 3:
                 z, y, x = point
                 pixel_points.append((
-                    z / voxel_size if voxel_size > 0 else 0,
-                    y / voxel_size if voxel_size > 0 else 0,
-                    x / voxel_size if voxel_size > 0 else 0
+                    z / voxel_size[0] if voxel_size[0] > 0 else 0,
+                    y / voxel_size[1] if voxel_size[1] > 0 else 0,
+                    x / voxel_size[2] if voxel_size[2] > 0 else 0
                 ))
             elif len(point) == 2:
                 y, x = point
                 pixel_points.append((
                     0,
-                    y / voxel_size if voxel_size > 0 else 0,
-                    x / voxel_size if voxel_size > 0 else 0
+                    y / voxel_size[1] if voxel_size[1] > 0 else 0,
+                    x / voxel_size[2] if voxel_size[2] > 0 else 0
                 ))
         return pixel_points
 
     def export_paths_as_tiff(self, output_path, obj_id):
-        """Export reconstructed paths as 3D TIFF image"""
+        """将重建的路径输出为3D TIFF图像"""
         if not self.analyzer.is_3d: return
         path_image = np.zeros_like(self.analyzer.skeleton, dtype=np.uint16)
         path_id = 1
@@ -318,23 +318,23 @@ class VisualizationReporter:
                 if 'path' in props:
                     for point in props['path']:
                         z, y, x = map(int, point[:3])
-                        if 0 <= z < path_image.shape and 0 <= y < path_image.shape and 0 <= x < path_image.shape:
+                        if 0 <= z < path_image.shape[0] and 0 <= y < path_image.shape[1] and 0 <= x < path_image.shape[2]:
                             path_image[z, y, x] = path_id
                 path_id += 1
         save_path = os.path.join(output_path, f"object_{obj_id}_reconstructed_paths.tiff")
         io.imsave(save_path, path_image, check_contrast=False)
-        print(f"Path reconstruction image saved to: {save_path}")
+        print(f"路径重建图像已保存至: {save_path}")
 
     # =========================================================================
-    #  [New] Network Construction Visualization (Migrated and refactored from Analyzer)
+    #  [新] 网络构建可视化 (从 Analyzer 迁移并重构)
     # =========================================================================
 
     def visualize_network_construction(self, segments_bp, segments_connected):
         """
-        Visualize key steps of network construction
-        Parameters come from return value of analyzer.analyze_network
+        可视化网络构建的关键步骤
+        参数来自 analyzer.analyze_network 的返回值
         """
-        # Recalculate temporary connected domains for visualization (keep Analyzer pure, do not store non-core states)
+        # 重新计算临时连通域用于可视化 (保持Analyzer纯净，不存储非核心状态)
         connectivity = 3 if self.analyzer.is_3d else 2
         labeled = measure.label(self.analyzer.skeleton, connectivity=connectivity)
 
@@ -346,15 +346,15 @@ class VisualizationReporter:
 
         os.makedirs(object_visualize_path, exist_ok=True)
 
-        # 1. Visualize network graph structure (Node-Edge Graph)
+        # 1. 可视化网络图结构 (Node-Edge Graph)
         graph_output_path = os.path.join(object_visualize_path, "network_graph.png")
         self.visualize_network_graph(output_path=graph_output_path)
 
 
     def visualize_network_graph(self, output_path=None):
-        """Visualize network graph structure (NetworkX Graph)"""
+        """可视化网络图结构 (NetworkX Graph)"""
         if not self.analyzer.graph:
-            print("Network graph has not been built yet, cannot visualize")
+            print("网络图尚未构建，无法可视化")
             return
 
         plt.figure(figsize=(12, 10))
@@ -373,7 +373,7 @@ class VisualizationReporter:
             plt.show()
         plt.close()
 
-    # --- Internal auxiliary plotting methods ---
+    # --- 内部辅助绘图方法 ---
 
     def _visualize_2d_network_graph(self):
         graph = self.analyzer.graph
@@ -385,7 +385,7 @@ class VisualizationReporter:
         self._add_graph_legend()
 
     def _visualize_3d_network_graph(self):
-        # Visualize 3D projection onto 2D plane
+        # 3D投影到2D平面可视化
         self._visualize_2d_network_graph()
 
     def _get_node_colors(self, graph):
@@ -436,9 +436,9 @@ class VisualizationReporter:
 
         for i, seg in enumerate(segments):
             path = seg['path']
-            coords = [(p, p) for p in path]  # Assuming 3D or 2D are in the last two dimensions
+            coords = [(p[1], p[2]) for p in path]  # 假设3D或2D都在最后两维
             for y, x in coords:
-                if 0 <= y < vis_img.shape and 0 <= x < vis_img.shape:
+                if 0 <= y < vis_img.shape[0] and 0 <= x < vis_img.shape[1]:
                     vis_img[y, x] = i + 1
 
         num_labels = max_label + 1
@@ -453,7 +453,7 @@ class VisualizationReporter:
         if self.analyzer.is_3d:
             vis_img = np.max(labeled_skeleton, axis=0)
         else:
-            vis_img = labeled_skeleton if labeled_skeleton.ndim == 3 else labeled_skeleton
+            vis_img = labeled_skeleton[0] if labeled_skeleton.ndim == 3 else labeled_skeleton
 
         num_labels = np.max(vis_img) + 1
         colors = plt.cm.nipy_spectral(np.linspace(0, 1, num_labels))
@@ -468,7 +468,7 @@ class VisualizationReporter:
         if self.analyzer.is_3d:
             vis_img = np.max(pixel_class, axis=0)
         else:
-            vis_img = pixel_class if pixel_class.ndim == 3 else pixel_class
+            vis_img = pixel_class[0] if pixel_class.ndim == 3 else pixel_class
 
         color_img = np.zeros((*vis_img.shape, 3), dtype=np.uint8)
         color_img[vis_img == 1] = [255, 0, 0]  # Endpoints
@@ -490,10 +490,10 @@ class VisualizationReporter:
 
 class VisualizationManager:
     """
-    Cytoskeleton Visualization Manager
+    细胞骨架可视化管理器
 
-    Parameters:
-    analyzer (CytoskeletonAnalyzer3D): Cytoskeleton analyzer instance
+    参数:
+    analyzer (CytoskeletonAnalyzer3D): 细胞骨架分析器实例
     """
 
     def __init__(self, analyzer):
@@ -505,21 +505,21 @@ class VisualizationManager:
         self.feature_table = analyzer.feature_table
 
     def visualize_global_network(self, edge_attribute='length', cmap='viridis'):
-        """Draw overall network projection of all objects - optimized version (uses edge_properties)"""
-        # Create 2-row 1-column layout
+        """绘制所有对象的整体网络投影 - 优化版（使用edge_properties）"""
+        # 创建2行1列的图形布局
         fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 24))
 
-        # Set figure and subplot 2 background to black
+        # 设置图形和子图2的背景为黑色
         fig.patch.set_facecolor('black')
         ax2.set_facecolor('black')
 
-        # Get background image
+        # 获取背景图像
         if self.is_3d:
             raw_bg = np.max(self.analyzer.raw_image, axis=0)
         else:
             raw_bg = self.analyzer.raw_image
 
-        # Max-min normalize original image
+        # 对原始图像进行max-min归一化
         raw_min = np.min(raw_bg)
         raw_max = np.max(raw_bg)
         if raw_max > raw_min:
@@ -527,7 +527,7 @@ class VisualizationManager:
         else:
             raw_bg = exposure.rescale_intensity(raw_bg, out_range=(0, 1))
 
-        # Subplot 1: Show normalized original image (no foreground)
+        # 子图1：显示归一化后的原始图像（无前景）
         im1 = ax1.imshow(raw_bg, cmap='gray', origin='upper', vmin=0, vmax=1)
         ax1.set_title("Normalized Original Image", fontsize=25, color='white')
         ax1.set_xlabel("X (μm)" if self.analyzer.apply_anisotropic else "X (px)")
@@ -535,10 +535,10 @@ class VisualizationManager:
         ax1.tick_params(axis='x', colors='white')
         ax1.tick_params(axis='y', colors='white')
 
-        # Prepare colormap data
-        all_values = []  # Collect property values for all edges
+        # 准备颜色映射数据
+        all_values = []  # 收集所有边的属性值
 
-        # First pass: collect property values of all edges
+        # 第一遍：收集所有边的属性值
         for obj_id, analyzer in self.network_cache.items():
             if not hasattr(analyzer, 'edge_properties'):
                 continue
@@ -548,103 +548,103 @@ class VisualizationManager:
                     value = props.get(edge_attribute, 0)
                     all_values.append(value)
 
-        # Enhanced color mapping processing
+        # 增强的颜色映射处理
         if all_values:
-            # Define range using percentiles, avoid outlier influence
+            # 使用百分位数定义范围，避免异常值影响
             vmin = np.percentile(all_values, 5)
             vmax = np.percentile(all_values, 95)
 
-            # Ensure vmax > vmin
+            # 确保vmax > vmin
             if vmax <= vmin:
-                # Handling when all values are almost identical
+                # 当所有值几乎相同时的处理
                 if vmin > 0:
                     vmax = vmin * 1.1
                 else:
                     vmin, vmax = 1e-6, 1.0
 
-            # Create normalizer and mapper
+            # 创建归一化器和映射器
             norm = mpl.colors.Normalize(vmin=vmin, vmax=vmax)
             mapper = plt.cm.ScalarMappable(norm=norm, cmap=cmap)
             mapper.set_array([])
         else:
-            print("Warning: No valid transport capacity values available for color mapping")
+            print("警告：没有有效的传输能力值可用于颜色映射")
             norm = None
             mapper = None
 
-        # Second pass: draw paths (only in subplot 2)
+        # 第二遍：绘制路径（只在子图2绘制）
         for obj_id, analyzer in self.network_cache.items():
             if not hasattr(analyzer, 'edge_properties'):
                 continue
 
-            # Iterate through all edges and fragments
+            # 遍历所有边及其片段
             for edge_key, properties_list in analyzer.edge_properties.items():
                 for props in properties_list:
-                    # Skip edges with no path data
+                    # 跳过没有路径数据的边
                     if 'path' not in props or len(props['path']) < 2:
                         continue
 
-                    # Get property value
+                    # 获取属性值
                     value = props.get(edge_attribute, 0)
                     path = props['path']
 
-                    # Prepare coordinate lists
+                    # 准备坐标列表
                     xs, ys = [], []
 
-                    # Process path points
+                    # 处理路径点
                     for point in path:
                         if self.is_3d:
-                            # 3D point: (z,y,x) -> project to (y,x)
+                            # 3D点: (z,y,x) -> 投影到(y,x)
                             _, y, x = point[:3]
                         else:
-                            # 2D point: may be (y,x) or (z,y,x) format
-                            if len(point) == 3:  # (z,y,x) format but z=0
+                            # 2D点: 可能是(y,x)或(z,y,x)格式
+                            if len(point) == 3:  # (z,y,x)格式但z=0
                                 _, y, x = point
-                            else:  # (y,x) format
+                            else:  # (y,x)格式
                                 y, x = point
                         xs.append(x)
                         ys.append(y)
 
-                    # Ensure enough data points
+                    # 确保有足够的数据点
                     if len(xs) < 2:
                         continue
 
-                    # Calculate color
+                    # 计算颜色
                     if mapper:
                         color = mapper.to_rgba(value)
-                        # Fixed line width at 1.0 (no longer dynamic)
+                        # 固定线宽为1.0（不再根据值动态调整）
                         linewidth = 1.0
                     else:
                         color = 'cyan'
                         linewidth = 1.0
 
-                    # Draw network path in subplot 2
+                    # 在子图2绘制网络路径
                     ax2.plot(xs, ys,
                              color=color,
                              linewidth=linewidth,
                              alpha=0.7,
                              solid_capstyle='round')
 
-        # Set labels and title for subplot 2
+        # 设置子图2的标签和标题
         ax2.set_title("Global Network Projection", fontsize=25, color='white')
         ax2.set_xlabel("X (μm)" if self.analyzer.apply_anisotropic else "X (px)", color='white')
         ax2.set_ylabel("Y (μm)" if self.analyzer.apply_anisotropic else "Y (px)", color='white')
         ax2.tick_params(axis='x', colors='white')
         ax2.tick_params(axis='y', colors='white')
 
-        # Uniform ratio and range for both subplots
+        # 统一两个子图的比例和范围
         ax2.set_xlim(ax1.get_xlim())
         ax2.set_ylim(ax1.get_ylim())
         ax2.set_aspect(ax1.get_aspect())
 
-        # # Only invert Y-axis for subplot 1
+        # # 只翻转子图1的Y轴
         # ax1.invert_yaxis()
 
-        # Fix: Add separate colorbar for subplot 2
+        # 修复：为子图2单独添加颜色条
         if mapper:
-            # Get position info of subplot 2
+            # 获取子图2的位置信息
             ax2_pos = ax2.get_position()
 
-            # Create colorbar axis to the right of subplot 2
+            # 在子图2的右侧创建颜色条轴
             cax = fig.add_axes([ax2_pos.x1 + 0.02, ax2_pos.y0, 0.02, ax2_pos.height])
             cbar = fig.colorbar(mapper, cax=cax, orientation='vertical')
             cbar.set_label(edge_attribute.upper(), fontsize=12, color='white')
@@ -652,17 +652,17 @@ class VisualizationManager:
             cbar.outline.set_edgecolor('white')
             plt.setp(plt.getp(cbar.ax.axes, 'yticklabels'), color='white')
 
-        # Adjust layout to prevent overlapping colorbars
+        # 调整布局，确保颜色条不会重叠
         plt.tight_layout()
 
-        # Save image
+        # 保存图像
         save_path = os.path.join(self.img_info.graph_dir, "global_network_projection.png")
         plt.savefig(save_path, dpi=300, bbox_inches='tight', facecolor='black')
         plt.close(fig)
 
 
     def visualize_global_3d_paths(self, edge_attribute='capacity'):
-        """Draw overall 3D network paths for all objects - modified version, colored by capacity"""
+        """绘制所有对象的整体3D网络路径 - 修正版，基于capacity着色"""
         if not self.is_3d:
             return
 
@@ -670,7 +670,7 @@ class VisualizationManager:
             fig = plt.figure(figsize=(18, 16))
             ax = fig.add_subplot(111, projection='3d')
 
-            # Collect capacity values of all edges
+            # 收集所有边的capacity值
             all_capacities = []
             for obj_id, analyzer in self.network_cache.items():
                 if not hasattr(analyzer, 'edge_properties'):
@@ -682,15 +682,15 @@ class VisualizationManager:
                         capacity = props.get('capacity', 0)
                         all_capacities.append(capacity)
 
-            # Handle empty datasets
+            # 处理空数据集
             if not all_capacities:
-                print("Warning: No valid transport capacity values detected")
+                print("警告：没有检测到有效的传输能力值")
                 return
 
-            # Determine normalization range (use percentiles to avoid outlier influence)
+            # 确定归一化范围（使用百分位数避免异常值影响）
             valid_capacities = [c for c in all_capacities if c > 0]
             if not valid_capacities:
-                print("Warning: Transport capacity values for all edges are 0 or negative")
+                print("警告：所有边的传输能力值为0或负数")
                 return
 
             vmin = np.percentile(valid_capacities, 5)
@@ -700,12 +700,12 @@ class VisualizationManager:
             mapper = plt.cm.ScalarMappable(norm=norm, cmap=cmap)
             mapper.set_array([])
 
-            # Iterate over all objects and paths
+            # 遍历所有对象和路径
             for obj_id, analyzer in self.network_cache.items():
                 if not hasattr(analyzer, 'edge_properties'):
                     continue
 
-                # Iterate over all edges and fragments
+                # 遍历所有边及其片段
                 for edge_key, properties_list in analyzer.edge_properties.items():
                     for props in properties_list:
                         if 'path' not in props:
@@ -713,115 +713,115 @@ class VisualizationManager:
 
                         path = props['path']
                         capacity = props.get(edge_attribute, 0)
-                        color = mapper.to_rgba(capacity)  # Get color using current capacity value
+                        color = mapper.to_rgba(capacity)  # 使用当前capacity值获取颜色
 
-                        # Extract coordinates
+                        # 提取坐标
                         xs, ys, zs = [], [], []
                         for point in path:
-                            if len(point) >= 3:  # Ensure it is a 3D point
+                            if len(point) >= 3:  # 确保是3D点
                                 z, y, x = point[:3]
                                 xs.append(x)
                                 ys.append(y)
                                 zs.append(z)
 
-                        if xs and ys and zs:  # Ensure valid points exist
-                            # Draw path
+                        if xs and ys and zs:  # 确保有有效的点
+                            # 绘制路径
                             ax.plot(xs, ys, zs,
                                     color=color,
                                     linewidth=0.8 + 3 * (capacity / vmax),
                                     alpha=0.7,
                                     solid_capstyle='round')
 
-            # Add colorbar
+            # 添加颜色条
             cbar = fig.colorbar(mapper, ax=ax, shrink=0.8, pad=0.1)
             cbar.set_label('Transport Capacity', fontsize=12)
             cbar.formatter = ScalarFormatter(useMathText=False)
             cbar.update_ticks()
 
-            # Set axes
-            ax.set_xlabel("X (μm)" if self.voxel_size != 1 else "X (px)")
-            ax.set_ylabel("Y (μm)" if self.voxel_size != 1 else "Y (px)")
-            ax.set_zlabel("Z (μm)" if self.voxel_size != 1 else "Z (px)")
+            # 设置坐标轴
+            ax.set_xlabel("X (μm)" if self.voxel_size[2] != 1 else "X (px)")
+            ax.set_ylabel("Y (μm)" if self.voxel_size[1] != 1 else "Y (px)")
+            ax.set_zlabel("Z (μm)" if self.voxel_size[0] != 1 else "Z (px)")
 
-            # Set view
+            # 设置视角
             ax.view_init(elev=25, azim=35)
 
-            # Title
+            # 标题
             ax.set_title("Global 3D Network Paths (Capacity Colored)", fontsize=16)
 
-            # Save image
+            # 保存图像
             save_path = os.path.join(self.img_info.graph_dir, "global_3d_network_paths.png")
             plt.savefig(save_path, dpi=300, bbox_inches='tight')
             plt.close(fig)
 
         except Exception as e:
-            print(f"Global 3D network visualization failed: {str(e)}")
+            print(f"全局3D网络可视化失败: {str(e)}")
             traceback.print_exc()
             plt.close('all')
 
     def visualize_network(self,
                           edge_attribute='capacity',
                           background_type='raw',
-                          cmap='viridis',  # Retain color parameter
+                          cmap='viridis',  # 保留颜色参数
                           output_suffix=None):
-        """Network visualization method (Improved version)
+        """网络可视化方法（改进版）
 
         Args:
-            edge_attribute: Edge attribute for coloring
-            background_type: Background type (raw/annotated)
-            cmap: Color map table (default viridis)
-            output_suffix: Output filename suffix
+            edge_attribute: 用于着色的边属性
+            background_type: 背景类型(raw/annotated)
+            cmap: 颜色映射表（默认viridis）
+            output_suffix: 输出文件名后缀
         """
-        # Get and preprocess background
+        # 获取并预处理背景
         bg_img = self._get_background_image(background_type)
         bg_img = (bg_img - bg_img.min()) / (bg_img.max() - bg_img.min())
-        # bg_img = exposure.rescale_intensity(bg_img, out_range=(0.1, 0.9))  # Smart contrast adjustment
+        # bg_img = exposure.rescale_intensity(bg_img, out_range=(0.1, 0.9))  # 智能对比度调整
 
-        # Create canvas
+        # 创建画布
         fig, ax = plt.subplots(figsize=(12, 12))
         ax.imshow(bg_img, cmap='gray', vmin=0.1, vmax=0.9)
 
-        # Edge data collection (with validation)
+        # 边数据收集（带校验）
         all_edges = []
         for obj in self.feature_table:
-            # Safely get object ID
+            # 安全获取对象ID
             obj_id = obj.get('object_id')
             if not obj_id:
                 continue
 
-            # Validate analyzer validity
+            # 校验分析器有效性
             analyzer = self.network_cache.get(obj_id)
             if not analyzer or not hasattr(analyzer, 'graph'):
                 continue
 
-            # Generate node coordinates (filter invalid values)
+            # 生成节点坐标（过滤无效值）
             node_pos = {}
             for n, coord in enumerate(analyzer.centroids):
                 try:
-                    if self.is_3d:  # 3D image processing
+                    if self.is_3d:  # 3D图像处理
                         z, y, x = map(float, coord)
                         if all(np.isfinite([z, y, x])):
                             node_pos[n] = (
-                                y * self.voxel_size,
-                                x * self.voxel_size
+                                y * self.voxel_size[1],
+                                x * self.voxel_size[2]
                             )
-                    else:  # 2D image processing
-                        # Handle possible (z,y,x) or (y,x) formats
-                        if len(coord) == 3:  # (z,y,x) format but z=0
+                    else:  # 2D图像处理
+                        # 处理可能存在的(z,y,x)或(y,x)两种格式
+                        if len(coord) == 3:  # (z,y,x)格式但z=0
                             _, y, x = coord
-                        else:  # (y,x) format
+                        else:  # (y,x)格式
                             y, x = coord
 
                         if all(np.isfinite([y, x])):
                             node_pos[n] = (
-                                y * self.voxel_size,
-                                x * self.voxel_size
+                                y * self.voxel_size[1],
+                                x * self.voxel_size[2]
                             )
                 except (TypeError, ValueError) as e:
-                    print(f"Exception processing node {n} coordinates: {str(e)}")
+                    print(f"节点{n}坐标处理异常: {str(e)}")
                     continue
 
-            # Collect edge data
+            # 收集边数据
             for u, v, data in analyzer.graph.edges(data=True):
                 if u in node_pos and v in node_pos:
                     y0, x0 = node_pos[u]
@@ -831,36 +831,36 @@ class VisualizationManager:
                         data.get(edge_attribute, 0)
                     ))
 
-        # Visualize edges (with normalization)
+        # 可视化边（带归一化）
         if all_edges:
-            values = [e for e in all_edges]
+            values = [e[4] for e in all_edges]
             valid_values = [v for v in values if v > 0]
 
             if valid_values:
-                # Dynamic range calculation
+                # 动态范围计算
                 vmin = np.percentile(valid_values, 5)
                 vmax = np.percentile(valid_values, 95)
                 norm = mpl.colors.LogNorm(vmin=vmin, vmax=vmax)
                 mapper = plt.cm.ScalarMappable(norm=norm, cmap=cmap)
 
-                # Draw segments
+                # 绘制线段
                 for y0, x0, y1, x1, val in all_edges:
                     if val <= 0:
                         continue
                     ax.plot(
-                        [x0, x1], [y0, y1],  # Note XY coordinate conversion
+                        [x0, x1], [y0, y1],  # 注意XY坐标转换
                         color=mapper.to_rgba(val),
-                        linewidth=0.3 + 2 * (val / vmax),  # Dynamic line width
+                        linewidth=0.3 + 2 * (val / vmax),  # 动态线宽
                         alpha=0.7,
                         solid_capstyle='round'
                     )
 
-                # Add colorbar
+                # 添加颜色条
                 divider = make_axes_locatable(ax)
                 cax = divider.append_axes("right", size="5%", pad=0.1)
                 plt.colorbar(mapper, cax=cax, label=edge_attribute.upper())
 
-        # Output configuration
+        # 输出配置
         filename = f"network_{background_type}"
         if output_suffix:
             filename += f"_{output_suffix}"
@@ -876,42 +876,42 @@ class VisualizationManager:
                         edge_attribute='capacity',
                         cmap='viridis',
                         output_suffix=None):
-        """Visualize complete edge paths (instead of endpoint lines) - New feature
+        """可视化完整边路径（而非端点连线） - 新功能
 
-        Args:
-            background_type: Background type (raw/ridge/skeleton)
-            edge_attribute: Edge attribute for coloring (e.g., 'capacity'/'length')
-            cmap: Color map table
-            output_suffix: Output filename suffix
+        参数:
+            background_type: 背景类型(raw/ridge/skeleton)
+            edge_attribute: 用于着色的边属性(如'capacity'/'length')
+            cmap: 颜色映射表
+            output_suffix: 输出文件名后缀
         """
-        # Get and preprocess background
+        # 获取并预处理背景
         bg_img = self._get_background_image(background_type)
         bg_img = exposure.rescale_intensity(bg_img, out_range=(0.1, 0.9))
 
-        # Create canvas
+        # 创建画布
         fig, ax = plt.subplots(figsize=(12, 12))
         ax.imshow(bg_img, cmap='gray', vmin=0.1, vmax=0.9)
 
-        # Collect all edge paths and attribute values
+        # 收集所有边的路径和属性值
         all_paths = []
         edge_values = []
 
-        # Iterate over all objects and network analyzers
+        # 遍历所有对象和网络分析器
         for obj_id, analyzer in self.network_cache.items():
-            # Check if analyzer contains path info
+            # 检查分析器是否包含路径信息
             if not hasattr(analyzer, 'edge_properties'):
                 continue
 
-            # Iterate over all edge paths
+            # 遍历所有边路径
             for edge_key, props in analyzer.edge_properties.items():
-                # Skip edges without path data
+                # 跳过没有路径数据的边
                 if 'path' not in props or len(props['path']) < 2:
                     continue
 
-                # Get property value
+                # 获取属性值
                 value = props.get(edge_attribute, 0)
                 if edge_attribute not in props:
-                    # Attempt to get attribute from graph edge
+                    # 尝试从图边获取属性
                     try:
                         graph_edge = analyzer.graph.edges[edge_key]
                         value = graph_edge.get(edge_attribute, 0)
@@ -921,7 +921,7 @@ class VisualizationManager:
                 edge_values.append(value)
                 all_paths.append(props['path'])
 
-        # If no valid paths, save and return directly
+        # 如果没有有效路径，直接保存并返回
         if not all_paths:
             ax.set_title("No Paths Found")
             ax.axis('off')
@@ -930,7 +930,7 @@ class VisualizationManager:
             plt.close()
             return
 
-        # Normalize property values for color mapping
+        # 归一化属性值用于颜色映射
         valid_values = [v for v in edge_values if v > 0]
         if valid_values:
             vmin = np.percentile(valid_values, 5)
@@ -941,40 +941,40 @@ class VisualizationManager:
         norm = mpl.colors.Normalize(vmin=vmin, vmax=vmax)
         mapper = plt.cm.ScalarMappable(norm=norm, cmap=cmap)
 
-        # Draw path segment by segment
+        # 逐条路径绘制
         for path_idx, path_points in enumerate(all_paths):
             value = edge_values[path_idx]
             color = mapper.to_rgba(value) if valid_values else 'cyan'
 
-            # Draw path in segments
+            # 逐段绘制路径
             for i in range(1, len(path_points)):
                 start = path_points[i - 1]
                 end = path_points[i]
 
-                # Handle coordinates of different dimensions
-                if len(start) == 3:  # 3D point:(z,y,x)
-                    y0, x0 = start, start
-                else:  # 2D point:(y,x)
-                    y0, x0 = start, start if len(start) > 1 else (0, 0)
+                # 处理不同维度的坐标
+                if len(start) == 3:  # 3D点:(z,y,x)
+                    y0, x0 = start[1], start[2]
+                else:  # 2D点:(y,x)
+                    y0, x0 = start[0], start[1] if len(start) > 1 else (0, 0)
 
-                if len(end) == 3:  # 3D point:(z,y,x)
-                    y1, x1 = end, end
-                else:  # 2D point:(y,x)
-                    y1, x1 = end, end if len(end) > 1 else (0, 0)
+                if len(end) == 3:  # 3D点:(z,y,x)
+                    y1, x1 = end[1], end[2]
+                else:  # 2D点:(y,x)
+                    y1, x1 = end[0], end[1] if len(end) > 1 else (0, 0)
 
-                ax.plot([x0, x1], [y0, y1],  # Convert XY order
+                ax.plot([x0, x1], [y0, y1],  # XY顺序转换
                         color=color,
                         linewidth=0.3 + 2 * (value / vmax if vmax > 0 else 0.3),
                         alpha=0.7,
                         solid_capstyle='round')
 
-        # Add colorbar (if valid attribute values exist)
+        # 添加颜色条（如果存在有效属性值）
         if valid_values:
             divider = make_axes_locatable(ax)
             cax = divider.append_axes("right", size="5%", pad=0.1)
             plt.colorbar(mapper, cax=cax, label=edge_attribute.upper())
 
-        # Output configuration
+        # 输出配置
         filename = f"paths_{background_type}"
         if output_suffix:
             filename += f"_{output_suffix}"
@@ -986,9 +986,9 @@ class VisualizationManager:
         plt.close()
 
     def _get_background_image(self, bg_type):
-        """Get background image"""
+        """获取背景图像"""
         if self.is_3d:
-            # Use max projection for 3D
+            # 3D使用最大投影
             if bg_type == 'raw':
                 bg_img = np.max(self.analyzer.raw_image, axis=0)
             elif bg_type == 'ridge':
@@ -996,7 +996,7 @@ class VisualizationManager:
             elif bg_type == 'skeleton':
                 bg_img = np.max(self.analyzer.skeleton, axis=0)
         else:
-            # Use raw image directly for 2D
+            # 2D直接使用原始图像
             if bg_type == 'raw':
                 bg_img = self.analyzer.raw_image
             elif bg_type == 'ridge':
@@ -1006,5 +1006,7 @@ class VisualizationManager:
         return bg_img
 
     def _select_cmap(self, bg_img):
-        """Smart selection of background color map"""
+        """智能选择背景颜色映射"""
         return 'gray_r' if np.median(bg_img) < 128 else 'gray'
+
+

@@ -39,7 +39,7 @@ class Load_Segmentation:
             labeled_objects = np.zeros(self.skeleton.shape, dtype=np.uint16)
 
             # Create convex hull layer by layer
-            for z in range(self.skeleton.shape):
+            for z in range(self.skeleton.shape[0]):
                 layer = self.skeleton[z]
 
                 # If the layer has any skeleton points
@@ -136,7 +136,7 @@ class Load_Segmentation:
     def _generate_layered_masks(self):
         """Generate optimized masks layer by layer (core modification)"""
         masks = []
-        for z in range(self.binary_image.shape):
+        for z in range(self.binary_image.shape[0]):
             layer = self.binary_image[z]
 
             # Layer-by-layer processing pipeline
@@ -176,8 +176,8 @@ class Load_Segmentation:
     @staticmethod
     def _touches_layer_border(region, shape):
         """Check if it touches the single layer border"""
-        return (region.bbox == 0 or region.bbox == shape or
-                region.bbox == 0 or region.bbox == shape)
+        return (region.bbox[0] == 0 or region.bbox[2] == shape[0] or
+                region.bbox[1] == 0 or region.bbox[3] == shape[1])
 
     def _refine_mask_3d(self, mask_3d):
         # Step adjustment:

@@ -134,8 +134,8 @@ class NetworkFeatureCalculator:
             hull = morphology.convex_hull_image(skeleton)
         else:
             # 2D image: ensure skeleton is a 2D array
-            if skeleton.shape == 1:
-                skeleton_2d = skeleton
+            if skeleton.shape[0] == 1:
+                skeleton_2d = skeleton[0]
             else:
                 skeleton_2d = skeleton
             hull = morphology.convex_hull_image(skeleton_2d)
@@ -203,8 +203,8 @@ class NetworkFeatureCalculator:
             morphology_data['compactness'] = compactness
         else:
             # 2D image: ensure skeleton is a 2D array
-            if skeleton.shape == 1:
-                skeleton_2d = skeleton
+            if skeleton.shape[0] == 1:
+                skeleton_2d = skeleton[0]
             else:
                 skeleton_2d = skeleton
 
@@ -243,23 +243,23 @@ class NetworkFeatureCalculator:
 
             # Diameter calculation
             mean_voxel_size = np.mean(voxel_size)
-            morphology_data['max_diameter_um'] = 2 * np.sqrt(5 * eigvals) * mean_voxel_size
+            morphology_data['max_diameter_um'] = 2 * np.sqrt(5 * eigvals[0]) * mean_voxel_size
             morphology_data['min_diameter_um'] = 2 * np.sqrt(5 * eigvals[-1]) * mean_voxel_size
             # Calculate median diameter (3D only)
             if self.extractor.is_3d and len(eigvals) > 2:
-                morphology_data['med_diameter_um'] = 2 * np.sqrt(5 * eigvals) * mean_voxel_size
+                morphology_data['med_diameter_um'] = 2 * np.sqrt(5 * eigvals[1]) * mean_voxel_size
 
             # Stretch
-            if eigvals > 0:
-                stretch = (eigvals - eigvals[-1]) / eigvals
+            if eigvals[0] > 0:
+                stretch = (eigvals[0] - eigvals[-1]) / eigvals[0]
             else:
                 stretch = np.nan
             morphology_data['stretch'] = stretch
 
             # Oblateness (3D only)
             if is_3d and len(eigvals) > 2:
-                if eigvals - eigvals > 0:
-                    oblateness = 2 * (eigvals - eigvals) / (eigvals - eigvals) - 1
+                if eigvals[0] - eigvals[2] > 0:
+                    oblateness = 2 * (eigvals[1] - eigvals[2]) / (eigvals[0] - eigvals[2]) - 1
                 else:
                     oblateness = np.nan
                 morphology_data['oblateness'] = oblateness
@@ -267,14 +267,14 @@ class NetworkFeatureCalculator:
 
             # Aspect ratio
             if eigvals[-1] > 0:
-                aspect_ratio = eigvals / eigvals[-1]
+                aspect_ratio = eigvals[0] / eigvals[-1]
             else:
                 aspect_ratio = np.nan
             morphology_data['aspect_ratio'] = aspect_ratio
 
             # Shape anisotropy
-            if eigvals > 0:
-                shape_anisotropy = 1 - (eigvals[-1] / eigvals)
+            if eigvals[0] > 0:
+                shape_anisotropy = 1 - (eigvals[-1] / eigvals[0])
             else:
                 shape_anisotropy = np.nan
             morphology_data['shape_anisotropy'] = shape_anisotropy
@@ -435,7 +435,7 @@ class NetworkFeatureCalculator:
                 if surface_edt is not None:
                     if self.extractor.is_3d:
                         voxel_coord = np.round(coord / self.extractor.voxel_size).astype(int)
-                        voxel_coord = np.clip(voxel_coord,, np.array(surface_edt.shape) - 1)
+                        voxel_coord = np.clip(voxel_coord, 0, np.array(surface_edt.shape) - 1)
                         d_ns = surface_edt[tuple(voxel_coord)]
                     else:
                         if len(coord) == 3:  # (z,y,x) format
@@ -443,7 +443,7 @@ class NetworkFeatureCalculator:
                         else:  # (y,x) format
                             y, x = coord
                         voxel_coord = np.round(np.array([y, x]) / self.extractor.voxel_size).astype(int)
-                        voxel_coord = np.clip(voxel_coord,, np.array(surface_edt.shape) - 1)
+                        voxel_coord = np.clip(voxel_coord, 0, np.array(surface_edt.shape) - 1)
                         d_ns = surface_edt[tuple(voxel_coord)]
                     d_ns_list.append(d_ns)
                 else:
@@ -556,9 +556,9 @@ class NetworkFeatureCalculator:
         spatial_data['direction_entropy'] = direction_entropy
         spatial_data['orientation_anisotropy'] = anisotropy
         spatial_data['orientation_order'] = oop_value
-        spatial_data['pca_comp1'] = pca_vars
-        spatial_data['pca_comp2'] = pca_vars
-        spatial_data['pca_comp3'] = pca_vars
+        spatial_data['pca_comp1'] = pca_vars[0]
+        spatial_data['pca_comp2'] = pca_vars[1]
+        spatial_data['pca_comp3'] = pca_vars[2]
 
         # Calculate topological anisotropy
         spatial_data['topological_anisotropy'] = self._calculate_network_anisotropy()
@@ -572,12 +572,12 @@ class NetworkFeatureCalculator:
 
         if self.extractor.is_3d:
             # 3D case: ensure vector points to "upper hemisphere"
-            if vector < 0:
+            if vector[2] < 0:
                 return -vector
-            elif abs(vector) < 1e-6:
-                if vector < 0:
+            elif abs(vector[2]) < 1e-6:
+                if vector[1] < 0:
                     return -vector
-                elif abs(vector) < 1e-6 and vector < 0:
+                elif abs(vector[1]) < 1e-6 and vector[0] < 0:
                     return -vector
         else:
             # 2D case: uniformly extract planar coordinates
@@ -594,9 +594,9 @@ class NetworkFeatureCalculator:
         vector = np.array(vector)
 
         if len(vector) == 3:  # (z,y,x) format
-            return vector, vector  # Return (y,x)
+            return vector[1], vector[2]  # Return (y,x)
         elif len(vector) == 2:  # (y,x) format
-            return vector, vector
+            return vector[0], vector[1]
         else:
             # Unknown format, try to use the last two components
             return vector[-2], vector[-1]
@@ -667,13 +667,13 @@ class NetworkFeatureCalculator:
             if self.extractor.is_3d:
                 # 3D: Use standard anisotropy formula (λ1 - λ3) / (λ1 + λ2 + λ3)
                 if len(eigenvalues) >= 3:
-                    anisotropy = (eigenvalues - eigenvalues) / np.sum(eigenvalues)
+                    anisotropy = (eigenvalues[0] - eigenvalues[2]) / np.sum(eigenvalues)
                 else:
                     return np.nan
             else:
                 # 2D: Use 2D anisotropy formula (λ1 - λ2) / (λ1 + λ2)
                 if len(eigenvalues) >= 2:
-                    anisotropy = (eigenvalues - eigenvalues) / np.sum(eigenvalues[:2])
+                    anisotropy = (eigenvalues[0] - eigenvalues[1]) / np.sum(eigenvalues[:2])
                 else:
                     return np.nan
 
