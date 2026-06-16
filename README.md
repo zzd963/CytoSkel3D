@@ -54,4 +54,4 @@ python Demo/run_edge_nonedge.py
 ### Citation
 If you use CytoSkel3D in your research, please cite:
 
-Zhou, Z., et al. CytoSkel3D: A Graph-Theoretical Framework for the Hierarchical Quantification of 3D Cytoskeletal Topology. *Manuscript in preparation*.
+Zhou, Z., et al. CytoSkel3D: A Graph-Theoretical Framework for Hierarchical Quantification of 3D Cytoskeletal Architecture. *Manuscript in preparation*.
