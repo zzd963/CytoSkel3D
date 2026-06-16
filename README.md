@@ -1,7 +1,8 @@
 ### CytoSkel3D: A Hierarchical Graph-Theoretical Framework for 3D Cytoskeletal Quantification
 ## Overview
 **CytoSkel3D** is a highly automated computational framework designed for the systematic quantification of complex three-dimensional (3D) cytoskeletal networks (e.g., actin, microtubules, and keratin). By overcoming the topological distortions inherent in traditional 2D projections, CytoSkel3D establishes a standardized dual-axis feature set that transforms raw volumetric data into 171 interpretable metrics across multiple structural scales and functional dimensions.
-<img width="4268" height="3613" alt="Graphical abstract2" src="https://github.com/user-attachments/assets/194a8d5a-a96d-4ee8-b39e-e58b0c8d3b0f" />
+
+<img width="4119" height="3831" alt="Graphical abstract" src="https://github.com/user-attachments/assets/fc9c7257-b236-416b-8c2f-578b4d39e56c" />
 
 **Key Features**
 - **Topological Fidelity**: Implements adaptive extraction algorithms to ensure structural integrity across diverse imaging conditions.
