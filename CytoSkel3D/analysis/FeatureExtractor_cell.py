@@ -55,7 +55,6 @@ class CellFeatureCalculator:
                 'stretch': np.nan,  # 细胞伸展度（最大特征值-最小特征值）/最大特征值；量化细胞的形状各向异性
                 'oblateness': np.nan,  # 细胞扁平度（3D）；量化细胞在垂直方向的扁平程度
                 'aspect_ratio': np.nan,  # 长宽比（主轴长度/最小轴长度）；量化细胞的形状各向异性
-                'shape_anisotropy': np.nan  # 形状各向异性（1-最小特征值/最大特征值）；量化细胞的方向偏好性
             }
         else:
             morphology_data = {
@@ -69,7 +68,6 @@ class CellFeatureCalculator:
                 'min_diameter_um': np.nan,  # 细胞最小直径；量化细胞的最小延伸距离
                 'stretch': np.nan,  # 细胞伸展度（最大特征值-最小特征值）/最大特征值；量化细胞的形状各向异性
                 'aspect_ratio': np.nan,  # 长宽比（主轴长度/最小轴长度）；量化细胞的形状各向异性
-                'shape_anisotropy': np.nan  # 形状各向异性（1-最小特征值/最大特征值）；量化细胞的方向偏好性
             }
 
         obj_mask = cell['obj_mask']
@@ -181,17 +179,11 @@ class CellFeatureCalculator:
 
             # 长宽比
             if eigvals[-1] > 0:
-                aspect_ratio = eigvals[0] / eigvals[-1]
+                aspect_ratio = np.sqrt(eigvals[0] / eigvals[-1])
             else:
                 aspect_ratio = np.nan
             morphology_data['aspect_ratio'] = aspect_ratio
 
-            # 形状各向异性
-            if eigvals[0] > 0:
-                shape_anisotropy = 1 - (eigvals[-1] / eigvals[0])
-            else:
-                shape_anisotropy = np.nan
-            morphology_data['shape_anisotropy'] = shape_anisotropy
 
         return morphology_data
 
@@ -226,7 +218,7 @@ class CellFeatureCalculator:
                 pca = PCA(n_components=3)
                 pca.fit(phys_coords)
                 main_direction = pca.components_[0]
-                dx, dy, dz = main_direction
+                dz, dy, dx = main_direction
 
                 # 计算向量模长
                 r = np.sqrt(dx ** 2 + dy ** 2 + dz ** 2)
@@ -248,7 +240,7 @@ class CellFeatureCalculator:
             # 2D情况：计算方向向量
             regions = measure.regionprops(obj_mask.astype(int))
             if regions:
-                orientation_angle = regions[0].orientation
+                orientation_angle = np.pi / 2 - regions[0].orientation
 
                 # 计算方向向量
                 dx = np.cos(orientation_angle)
@@ -465,6 +457,7 @@ class CellFeatureCalculator:
                 ignore_zeros=True,  # 忽略零值像素（背景）
                 compute_14th_feature=False,  # 不计算第14个特征
                 return_mean=True,  # 返回所有方向的平均值
+                use_x_minus_y_variance=True,
                 distance=distance  # 使用指定的距离
             )
 
@@ -657,11 +650,11 @@ class CellFeatureCalculator:
             pca = PCA(n_components=3)
             pca.fit(phys_coords)
             main_direction = pca.components_[0]
-            orientation_angle = np.arctan2(main_direction[1], main_direction[0])
+            orientation_angle = np.arctan2(main_direction[1], main_direction[2])
         else:
             # 2D中获取方向角
             regions = measure.regionprops(obj_mask.astype(int))
-            orientation_angle = regions[0].orientation if regions else 0
+            orientation_angle = np.pi / 2 - regions[0].orientation if regions else 0
 
         # === 6. 计算CARIP特征 ===
         # 按距离排序所有像素点
@@ -743,8 +736,8 @@ class CellFeatureCalculator:
                 theta = np.arccos(np.clip(cos_theta, -1.0, 1.0))
 
                 # 初始化完整的角度数组（中心点为NaN）
-                phi_full = np.full_like(dx, np.nan)
-                theta_full = np.full_like(dx, np.nan)
+                phi_full = np.full_like(dx, np.nan, dtype=np.float64)
+                theta_full = np.full_like(dx, np.nan, dtype=np.float64)
 
                 phi_full[valid_mask] = phi
                 theta_full[valid_mask] = theta

@@ -19,8 +19,8 @@ class Img_Information:
         self.basename = os.path.basename(filepath)
         self.maskpath = maskpath
 
-        self.filename_no_ext = os.path.splitext(self.basename)
-        self.extension = os.path.splitext(filepath)
+        self.filename_no_ext = os.path.splitext(self.basename)[0]
+        self.extension = os.path.splitext(filepath)[1]
         self.output_dir = output_dir or os.path.join(self.input_dir, 'output')
 
         # Create directory structure
@@ -129,9 +129,9 @@ class Img_Information:
     def _find_tif_metadata(self):
         """Extract TIFF metadata"""
         with tifffile.TiffFile(self.filepath) as tif:
-            self.axes = tif.series.axes
-            self.shape = tif.series.shape
-            page = tif.pages
+            self.axes = tif.series[0].axes
+            self.shape = tif.series[0].shape
+            page = tif.pages[0]
             self.metadata = {tag.name: tag.value for tag in page.tags.values()}
             self.metadata_type = 'basic_tiff'
 
@@ -148,9 +148,9 @@ class Img_Information:
         # Process X/Y pixel size
         for axis in ['X', 'Y']:
             if tag := self.metadata.get(f'{axis}Resolution'):
-                if tag != 0:
+                if tag[0] != 0:
                     # Calculate actual pixel size (unit: micrometer)
-                    self.pixel_size[axis] = (tag / tag) * unit_scale
+                    self.pixel_size[axis] = (tag[0] / tag[1]) * unit_scale
 
         # Process Z pixel size
         if 'ZResolution' in self.metadata and 'Z' in self.axes:
@@ -295,7 +295,7 @@ class Img_Information:
     #
     #     # Validate mask and image size match
     #     with tifffile.TiffFile(self.maskpath) as tif:
-    #         mask_shape = tif.series.shape
+    #         mask_shape = tif.series[0].shape
     #         if mask_shape != self.shape:
     #             raise ValueError(f"Mask shape {mask_shape} does not match image shape {self.shape}")
 
@@ -313,7 +313,7 @@ class Img_Information:
         # Get spatial size of the mask
         if self.maskpath.lower().endswith(('.tif', '.tiff')):
             with tifffile.TiffFile(self.maskpath) as tif:
-                mask_shape = tif.series.shape
+                mask_shape = tif.series[0].shape
                 mask_yx = mask_shape[-2], mask_shape[-1]  # Take the last two dimensions
         else:
             with Image.open(self.maskpath) as img:
@@ -350,7 +350,7 @@ class Img_Information:
             if mask_data.ndim != data.ndim:
                 # If mask is 2D and data is 3D, expand mask to 3D
                 if mask_data.ndim == 2 and data.ndim == 3:
-                    mask_data = np.repeat(mask_data[np.newaxis, :, :], data.shape, axis=0)
+                    mask_data = np.repeat(mask_data[np.newaxis, :, :], data.shape[0], axis=0)
                 # If mask is 3D and data is 2D, take the first layer of the mask
                 elif mask_data.ndim == 3 and data.ndim == 2:
                     mask_data = mask_data[0, :, :]
@@ -541,8 +541,8 @@ def save_processing_metadata(output_path, processing_params, file_dict, addition
             if isinstance(paths, (tuple, list)):
                 if len(paths) >= 2:
                     # At least 2 elements: image file and mask file
-                    f.write(f"    Image file: {paths}\n")
-                    f.write(f"    Mask file: {paths}\n")
+                    f.write(f"    Image file: {paths[0]}\n")
+                    f.write(f"    Mask file: {paths[1]}\n")
 
                     # If more than 2 elements, output extra paths
                     if len(paths) > 2:
@@ -624,7 +624,7 @@ def save_processing_metadata(output_path, processing_params, file_dict, addition
             f.write(f"  {method}:\n")
             for param, value in params.items():
                 if param == 'sigmas' and isinstance(value, list):
-                    f.write(f"    {param}: [{value:.1f} ~ {value[-1]:.1f}] (total {len(value)} values)\n")
+                    f.write(f"    {param}: [{value[0]:.1f} ~ {value[-1]:.1f}] (total {len(value)} values)\n")
                 else:
                     f.write(f"    {param}: {value}\n")
             f.write("\n")

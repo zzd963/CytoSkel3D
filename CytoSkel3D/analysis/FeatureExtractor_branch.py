@@ -73,47 +73,43 @@ class BranchFeatureCalculator:
         components = list(nx.connected_components(self.extractor.graph))
 
         for branch_id, comp in enumerate(components):
-            # 创建子图
+            # Restrict degree counts to this connected component.
             subgraph = self.extractor.graph.subgraph(comp)
 
-            # 计算分支端点（度=1的节点）
+            # Identify branch endpoints (nodes of degree one).
             endpoints = [n for n, d in subgraph.degree() if d == 1]
 
-            # 计算分支长度（所有边长度之和）
             total_length = 0
-            segments = []  # 存储所有片段
-            branch_pixels = []  # 存储分支的所有像素点（像素坐标）
+            segments = []
+            branch_pixels = []
 
-            # 遍历所有边
-            for u, v in subgraph.edges():
-                # 尝试两种可能的边键顺序
-                edge_key1 = (u, v)
-                edge_key2 = (v, u)
-
-                # 检查边属性是否存在
-                if edge_key1 in self.extractor.edge_properties:
-                    props_list = self.extractor.edge_properties[edge_key1]
-                elif edge_key2 in self.extractor.edge_properties:
-                    props_list = self.extractor.edge_properties[edge_key2]
-                else:
+            # Sum lengths from mapped segments and collect distinct skeleton points.
+            seen_points = set()
+            for segment in self.extractor.segment_records:
+                if self.extractor.segment_branch_map[segment['id']] != branch_id:
                     continue
+                props = segment['props']
+                total_length += props.get('length', 0)
+                segments.append(segment)
 
-                for prop_idx, props in enumerate(props_list):
-                    # 累加长度
-                    seg_length = props.get('length', 0)
-                    total_length += seg_length
+                for point in segment['path']:
+                    key = tuple(point)
+                    if key not in seen_points:
+                        seen_points.add(key)
+                        branch_pixels.append(point)
 
-                    # 创建线段对象
-                    segment = {
-                        'id': f"{u}_{v}_{prop_idx}" if edge_key1 in self.extractor.edge_properties else f"{v}_{u}_{prop_idx}",
-                        'edge_key': edge_key1 if edge_key1 in self.extractor.edge_properties else edge_key2,
-                        'props': props
-                    }
-                    segments.append(segment)
-
-                    # 收集路径点（像素坐标）
-                    if 'path' in props:
-                        for point in props['path']:
+            # Retain single-point edges for branch intensity sampling.
+            for (u, v), props_list in self.extractor.edge_properties.items():
+                if self.extractor.node_branch_map.get(u) != branch_id:
+                    continue
+                for props in props_list:
+                    path = props.get('path', [])
+                    if len(path) > 1:
+                        continue
+                    for point in path:
+                        key = tuple(point)
+                        if key not in seen_points:
+                            seen_points.add(key)
                             branch_pixels.append(point)
 
             branches.append({
@@ -123,7 +119,7 @@ class BranchFeatureCalculator:
                 'total_length': total_length,
                 'segment_count': len(segments),
                 'segments': segments,
-                'pixels': branch_pixels  # 像素坐标
+                'pixels': branch_pixels
             })
 
         return branches

@@ -416,43 +416,68 @@ class NetworkReconstructor:
         """
         Optimized Dijkstra: Build local search or use global tree only when needed
         """
-        if self.global_tree is None:
+        dist = self._distance(start, end)
+        if dist <= np.sqrt(3) + 1e-5:
+            return np.array([start, end])
+
+        coords = np.argwhere(self.skeleton)
+        if len(coords) == 0:
             return self._interpolate_points(start, end)
 
-        start_arr, end_arr = np.array(start), np.array(end)
-        dist_direct = np.linalg.norm(start_arr - end_arr)
+        # Locate the endpoints on the skeleton and construct its adjacency.
+        tree = spatial.KDTree(coords)
+        start_dist, start_idx = tree.query(start)
+        end_dist, end_idx = tree.query(end)
+        start_node, end_node = tuple(coords[start_idx]), tuple(coords[end_idx])
+        if np.array_equal(start_node, end_node):
+            return np.array([start_node])
 
-        # If very close, interpolate directly
-        if dist_direct < np.sqrt(3) + 1e-3:
-            return self._interpolate_points(start, end)
-
-        # Find the nearest skeleton pixel index
-        d1, idx1 = self.global_tree.query(start_arr)
-        d2, idx2 = self.global_tree.query(end_arr)
-
-        if idx1 == idx2:
-            return np.array([start_arr])
-
-        # Dijkstra here is still relatively heavy, but necessary on a full skeleton graph.
-        # To accelerate, we could limit the search range (only search expanded bounding box between start and end)
-        # But to ensure connectivity, simplified here: if disconnected on global skeleton, connect with a straight line
-
-        # Build graph (build only on first call or when needed, or use networkx)
-        # Given code complexity, use simplified "linear interpolation" as fallback here,
-        # traverse skeleton only when there is actually a skeleton path.
-        # A true implementation requires a pre-computed skeleton graph.
-        # To not break your class structure, I am keeping an efficient local search logic here:
-
-        return self._interpolate_points(start, end)  # Simplified processing, actual projects are recommended to pre-compute nx.Graph
+        graph = {}
+        for idx, pt in enumerate(coords):
+            neighbors = tree.query_ball_point(pt, r=1.5)
+            graph[tuple(pt)] = [tuple(coords[i]) for i in neighbors if i != idx]
+        dist_map = {node: float('inf') for node in graph}
+        prev = {node: None for node in graph}
+        dist_map[start_node] = 0
+        queue = [(0, start_node)]
+        while queue:
+            current_dist, u = heapq.heappop(queue)
+            if u == end_node:
+                break
+            if current_dist > dist_map[u]:
+                continue
+            for v in graph.get(u, []):
+                alt = dist_map[u] + 1
+                if alt < dist_map[v]:
+                    dist_map[v] = alt
+                    prev[v] = u
+                    heapq.heappush(queue, (alt, v))
+        path = []
+        u = end_node
+        while u is not None:
+            path.append(u)
+            u = prev.get(u)
+        path.reverse()
+        return np.array(path) if path else np.array([start_node, end_node])
 
     def _interpolate_points(self, start, end):
         """Simple linear interpolation"""
-        p1, p2 = np.array(start), np.array(end)
-        num = max(2, int(np.linalg.norm(p1 - p2)) + 1)
-
-        # np.linspace produces floats, need to round and convert to int
-        points = np.linspace(p1, p2, num)
-        return np.round(points).astype(int)
+        dist = self._distance(start, end)
+        # Round interpolated coordinates to integer pixel or voxel indices.
+        num_points = max(3, int(np.ceil(dist)) + 1)
+        points = []
+        for i in range(num_points):
+            ratio = i / (num_points - 1)
+            if len(start) == 3:
+                z = start[0] + ratio * (end[0] - start[0])
+                y = start[1] + ratio * (end[1] - start[1])
+                x = start[2] + ratio * (end[2] - start[2])
+                points.append([int(round(z)), int(round(y)), int(round(x))])
+            else:
+                y = start[0] + ratio * (end[0] - start[0])
+                x = start[1] + ratio * (end[1] - start[1])
+                points.append([int(round(y)), int(round(x))])
+        return np.array(points)
 
     def _distance(self, p1, p2):
         return np.linalg.norm(np.array(p1) - np.array(p2))

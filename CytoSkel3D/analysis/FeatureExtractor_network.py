@@ -83,7 +83,6 @@ class NetworkFeatureCalculator:
                 'stretch': np.nan,  # Stretch (max eigenvalue - min eigenvalue) / max eigenvalue; quantifies shape anisotropy of network
                 'oblateness': np.nan,  # Oblateness (3D); quantifies flatness of network in vertical direction
                 'aspect_ratio': np.nan,  # Aspect ratio (major axis length / minor axis length); quantifies shape anisotropy of network
-                'shape_anisotropy': np.nan  # Shape anisotropy (1 - min eigenvalue / max eigenvalue); quantifies directional preference of network
             }
         else:
             morphology_data = {
@@ -102,7 +101,6 @@ class NetworkFeatureCalculator:
                 'stretch': np.nan,  # Stretch (max eigenvalue - min eigenvalue) / max eigenvalue; quantifies shape anisotropy of network
                 # 'fractal_dimension': np.nan  # Fractal dimension
                 'aspect_ratio': np.nan,  # Aspect ratio (major axis length / minor axis length); quantifies shape anisotropy of network
-                'shape_anisotropy': np.nan  # Shape anisotropy (1 - min eigenvalue / max eigenvalue); quantifies directional preference of network
             }
 
         skeleton = network['skeleton']
@@ -267,17 +265,12 @@ class NetworkFeatureCalculator:
 
             # Aspect ratio
             if eigvals[-1] > 0:
-                aspect_ratio = eigvals[0] / eigvals[-1]
+                aspect_ratio = np.sqrt(eigvals[0] / eigvals[-1])
             else:
                 aspect_ratio = np.nan
             morphology_data['aspect_ratio'] = aspect_ratio
 
             # Shape anisotropy
-            if eigvals[0] > 0:
-                shape_anisotropy = 1 - (eigvals[-1] / eigvals[0])
-            else:
-                shape_anisotropy = np.nan
-            morphology_data['shape_anisotropy'] = shape_anisotropy
         return morphology_data
 
     def _calculate_network_topology(self, network):

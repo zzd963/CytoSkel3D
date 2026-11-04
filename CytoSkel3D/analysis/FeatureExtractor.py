@@ -145,6 +145,7 @@ class FeatureExtractor:
         self.node_branch_map = {}
 
         # If graph does not exist, return directly
+        self.segment_records = []
         if not self.graph:
             return
 
@@ -153,43 +154,26 @@ class FeatureExtractor:
 
         # Assign ID to each connected component (branch)
         for branch_id, comp in enumerate(components):
-            # Create subgraph
-            subgraph = self.graph.subgraph(comp)
-
-            # Iterate through all edges of the subgraph
-            for u, v in subgraph.edges():
-                # Try two possible edge key orders
-                edge_key1 = (u, v)
-                edge_key2 = (v, u)
-
-                # Check if edge property exists
-                if edge_key1 in self.edge_properties:
-                    props_list = self.edge_properties[edge_key1]
-                elif edge_key2 in self.edge_properties:
-                    props_list = self.edge_properties[edge_key2]
-                else:
-                    continue
-
-                # Assign unique ID to each segment
-                for prop_idx, props in enumerate(props_list):
-                    # Create unique segment ID - use numeric ID
-                    segment_id = len(self.segment_branch_map)  # Use current mapping count as ID
-
-                    # Add segment to branch mapping
-                    self.segment_branch_map[segment_id] = branch_id
-
-                    # Add node to segment mapping
-                    if u not in self.node_segment_map:
-                        self.node_segment_map[u] = []
-                    self.node_segment_map[u].append(segment_id)
-
-                    if v not in self.node_segment_map:
-                        self.node_segment_map[v] = []
-                    self.node_segment_map[v].append(segment_id)
-
-            # Add node to branch mapping
             for node_id in comp:
                 self.node_branch_map[node_id] = branch_id
+
+        # Iterate through each stored edge once to preserve segment identities.
+        for edge_key, props_list in self.edge_properties.items():
+            u, v = edge_key
+            if not self.graph.has_edge(u, v):
+                raise ValueError("Segment endpoints are absent from the graph: " + str(edge_key))
+            for prop_idx, props in enumerate(props_list):
+                path = props.get('path', [])
+                if len(path) <= 1:
+                    continue
+                # Assign a unique numeric ID to each segment.
+                segment_id = len(self.segment_records)
+                self.segment_records.append({'id': segment_id,
+                    'edge_key': (u, v, prop_idx), 'props': props, 'path': path})
+                # Add the segment to the branch mapping and its endpoints to the node mapping.
+                self.segment_branch_map[segment_id] = self.node_branch_map[u]
+                for node_id in dict.fromkeys((u, v)):
+                    self.node_segment_map.setdefault(node_id, []).append(segment_id)
 
     def _calc_network_features(self):
         """Calculate features for each level, filter parameters according to level selection, and retain feature aggregation"""
@@ -597,36 +581,36 @@ class FeatureExtractor:
             features['CVIntensity'] = np.nan
 
         # === New: Calculate Skewness ===
+        moment_values = intensities.astype(np.float64, copy=False)
+        moment_mean = np.mean(moment_values)
+        moment_std = np.std(moment_values)
+
+        # Use the sample skewness formula (Fisher-Pearson coefficient).
         if n_points >= 3 and features['StdIntensity'] > 0:
-            # Use sample skewness formula (Fisher-Pearson coefficient)
-            mean_val = features['MeanIntensity']
-            std_val = features['StdIntensity']
-            # Use unbiased estimate, when n is large (n-1) ≈ n
+            mean_val = moment_mean
+            std_val = moment_std
             if n_points > 1:
-                # Sample skewness formula: g1 = (n/((n-1)*(n-2))) * Σ((x_i - mean)/std)^3
                 n = n_points
-                cubed_deviations = np.sum(((intensities - mean_val) / std_val) ** 3)
+                std_val *= np.sqrt(n / (n - 1))
+                cubed_deviations = np.sum(((moment_values - mean_val) / std_val) ** 3)
                 features['SkewnessIntensity'] = (n * cubed_deviations) / ((n - 1) * (n - 2))
             else:
                 features['SkewnessIntensity'] = np.nan
         else:
             features['SkewnessIntensity'] = np.nan
 
-        # === New: Calculate Kurtosis ===
+        # Calculate sample excess kurtosis (zero for a normal distribution).
         if n_points >= 4 and features['StdIntensity'] > 0:
-            # Use sample kurtosis formula (Excess kurtosis, normal distribution is 0)
-            mean_val = features['MeanIntensity']
-            std_val = features['StdIntensity']
+            mean_val = moment_mean
+            std_val = moment_std
             n = n_points
+            std_val *= np.sqrt(n / (n - 1))
 
-            # Calculate fourth central moment
-            fourth_moment = np.mean((intensities - mean_val) ** 4)
+            fourth_moment = np.mean((moment_values - mean_val) ** 4)
 
-            # Excess kurtosis formula: g2 = (n*(n+1)/((n-1)*(n-2)*(n-3))) * Σ((x_i - mean)/std)^4 - 3*(n-1)^2/((n-2)*(n-3))
             if n > 3:
-                # First calculation method: use formula
                 term1 = n * (n + 1) / ((n - 1) * (n - 2) * (n - 3))
-                fourth_power_sum = np.sum(((intensities - mean_val) / std_val) ** 4)
+                fourth_power_sum = np.sum(((moment_values - mean_val) / std_val) ** 4)
                 term2 = 3 * (n - 1) ** 2 / ((n - 2) * (n - 3))
                 features['KurtosisIntensity'] = term1 * fourth_power_sum - term2
             else:
@@ -759,14 +743,14 @@ class FeatureExtractor:
             main_direction = pca.components_[0]
 
             # Calculate azimuth angle (XY plane angle)
-            dx, dy, dz = main_direction
+            dz, dy, dx = main_direction
             return np.arctan2(dy, dx)  # Return radians
         else:
             # 2D object uses regionprops
             regions = measure.regionprops(obj_mask.astype(int))
             if not regions:
                 return 0.0
-            return regions[0].orientation  # Return radians
+            return np.pi / 2 - regions[0].orientation  # Return radians
 
     def _to_physical_coordinates(self, input_data):
         """Coordinate conversion (migrated from Analyzer)"""

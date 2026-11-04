@@ -40,8 +40,8 @@ class SyntheticFilamentGenerator:
         """Generate a single actin filament curve"""
         # Random start point
         if start_point is None:
-            start_point = (np.random.randint(0, self.img_size),
-                           np.random.randint(0, self.img_size))
+            start_point = (np.random.randint(0, self.img_size[1]),
+                           np.random.randint(0, self.img_size[0]))
 
         # Random Z-layer assignment
         if self.is_3d and z_layer is None:
@@ -52,8 +52,8 @@ class SyntheticFilamentGenerator:
 
         # Random end point direction
         angle = np.random.uniform(0, 2 * np.pi)
-        end_point = (start_point + int(length * np.cos(angle)),
-                     start_point + int(length * np.sin(angle)))
+        end_point = (start_point[0] + int(length * np.cos(angle)),
+                     start_point[1] + int(length * np.sin(angle)))
 
         # Control point generation
         ctrl_points = [start_point]
@@ -61,8 +61,8 @@ class SyntheticFilamentGenerator:
             dist = i * length / 3
             offset = np.random.normal(0, curvature * length, size=2)
             ctrl_points.append((
-                int(start_point + dist * np.cos(angle) + offset),
-                int(start_point + dist * np.sin(angle) + offset)
+                int(start_point[0] + dist * np.cos(angle) + offset[0]),
+                int(start_point[1] + dist * np.sin(angle) + offset[1])
             ))
         ctrl_points.append(end_point)
 
@@ -79,8 +79,8 @@ class SyntheticFilamentGenerator:
         # Crop to image bounds
         valid_points = []
         for point in points:
-            if (0 <= point < self.img_size and
-                    0 <= point < self.img_size):
+            if (0 <= point[0] < self.img_size[1] and
+                    0 <= point[1] < self.img_size[0]):
                 valid_points.append(point)
 
         return np.array(valid_points), z_layer, length, ctrl_points
@@ -95,25 +95,25 @@ class SyntheticFilamentGenerator:
         cross_point = base_filament[cross_idx]
 
         direction = base_filament[cross_idx + 5] - base_filament[cross_idx - 5]
-        base_angle = np.arctan2(direction, direction) * 180 / np.pi
+        base_angle = np.arctan2(direction[1], direction[0]) * 180 / np.pi
 
         cross_angle = np.random.uniform(*cross_angle_range)
         actual_angle = base_angle + cross_angle
         angle_rad = np.deg2rad(actual_angle)
 
-        crossing_type = np.random.choice(, p=[0.7, 0.3])
+        crossing_type = np.random.choice([3, 4], p=[0.7, 0.3])
 
         if crossing_type == 3:
             length = np.random.randint(*cross_length_range)
             end_point = (
-                int(cross_point + length * np.cos(angle_rad)),
-                int(cross_point + length * np.sin(angle_rad))
+                int(cross_point[0] + length * np.cos(angle_rad)),
+                int(cross_point[1] + length * np.sin(angle_rad))
             )
             num_points = max(min(int(length * 3), 500), 20)
 
             # Use linspace to ensure continuity
-            x_vals = np.linspace(cross_point, end_point, num_points)
-            y_vals = np.linspace(cross_point, end_point, num_points)
+            x_vals = np.linspace(cross_point[0], end_point[0], num_points)
+            y_vals = np.linspace(cross_point[1], end_point[1], num_points)
             cross_filament = np.column_stack((x_vals, y_vals)).astype(int)
 
         else:
@@ -122,24 +122,24 @@ class SyntheticFilamentGenerator:
             length2 = int(np.random.randint(*cross_length_range) * (1 - factor1))
 
             end_point1 = (
-                int(cross_point + length1 * np.cos(angle_rad)),
-                int(cross_point + length1 * np.sin(angle_rad))
+                int(cross_point[0] + length1 * np.cos(angle_rad)),
+                int(cross_point[1] + length1 * np.sin(angle_rad))
             )
             end_point2 = (
-                int(cross_point - length2 * np.cos(angle_rad)),
-                int(cross_point - length2 * np.sin(angle_rad))
+                int(cross_point[0] - length2 * np.cos(angle_rad)),
+                int(cross_point[1] - length2 * np.sin(angle_rad))
             )
 
             num_points1 = max(min(int(length1 * 3), 500), 20)
             num_points2 = max(min(int(length2 * 3), 500), 20)
 
             pts1 = np.column_stack((
-                np.linspace(cross_point, end_point1, num_points1),
-                np.linspace(cross_point, end_point1, num_points1)
+                np.linspace(cross_point[0], end_point1[0], num_points1),
+                np.linspace(cross_point[1], end_point1[1], num_points1)
             ))
             pts2 = np.column_stack((
-                np.linspace(cross_point, end_point2, num_points2),
-                np.linspace(cross_point, end_point2, num_points2)
+                np.linspace(cross_point[0], end_point2[0], num_points2),
+                np.linspace(cross_point[1], end_point2[1], num_points2)
             ))
 
             cross_filament = np.vstack((pts1, pts2)).astype(int)
@@ -216,13 +216,13 @@ class SyntheticFilamentGenerator:
         # Draw
         # Optimization: Use NumPy advanced indexing to improve speed
         for filament_data in filaments:
-            filament = filament_data
-            z_layer = filament_data
+            filament = filament_data[0]
+            z_layer = filament_data[1]
 
             # Boundary check
             valid_mask = (
-                    (filament[:, 0] >= 0) & (filament[:, 0] < self.img_size) &
-                    (filament[:, 1] >= 0) & (filament[:, 1] < self.img_size)
+                    (filament[:, 0] >= 0) & (filament[:, 0] < self.img_size[1]) &
+                    (filament[:, 1] >= 0) & (filament[:, 1] < self.img_size[0])
             )
             valid_pts = filament[valid_mask]
 
@@ -238,8 +238,8 @@ class SyntheticFilamentGenerator:
     def thicken_filaments(self, base_image, kernel_size_range=(3, 7)):
         """Thicken actin filaments (3D optimized version)"""
         if isinstance(kernel_size_range, tuple) and len(kernel_size_range) == 2:
-            if kernel_size_range == kernel_size_range:
-                kernel_size = kernel_size_range
+            if kernel_size_range[0] == kernel_size_range[1]:
+                kernel_size = kernel_size_range[0]
             else:
                 kernel_size = np.random.randint(*kernel_size_range)
         else:
@@ -318,7 +318,7 @@ class SyntheticFilamentGenerator:
         # Erosion operation to get pure background region
         if self.is_3d:
             # 3D image uses 3D morphological operations
-
+            from skimage.morphology import ball
             background_mask = erosion(background_mask_, ball(3))
         else:
             # 2D image uses disk structuring element
@@ -366,16 +366,16 @@ class SyntheticFilamentGenerator:
 
             # Derivative control
             if i == 0 or i == 3:
-                deriv = np.random.uniform(derivative_range, derivative_range) * np.sign(np.random.randn())
+                deriv = np.random.uniform(derivative_range[0], derivative_range[1]) * np.sign(np.random.randn())
             else:
                 if np.random.random() > 0.7:
                     deriv = 0
                 else:
-                    deriv = np.random.uniform(-derivative_range, derivative_range)
+                    deriv = np.random.uniform(-derivative_range[1], derivative_range[1])
             points.append((z_val, deriv))
 
-        cs = CubicSpline(t, [p for p in points],
-                         bc_type=((1, points), (1, points)))
+        cs = CubicSpline(t, [p[0] for p in points],
+                         bc_type=((1, points[0][1]), (1, points[3][1])))
 
         u = np.linspace(0, 1, num_points)
         z_curve = cs(u)
@@ -398,8 +398,8 @@ class SyntheticFilamentGenerator:
         filaments_with_z = []
 
         for i, filament_data in enumerate(filaments):
-            filament = filament_data
-            base_z = filament_data
+            filament = filament_data[0]
+            base_z = filament_data[1]
             num_points = len(filament)
 
             z_curve = self._generate_z_curve(num_points, base_z, z_variation)
@@ -412,17 +412,17 @@ class SyntheticFilamentGenerator:
                 z2 = z_curve[j + 1]
 
                 # Calculate steps between two points to ensure coverage of each voxel
-                dist = max(abs(p2 - p1), abs(p2 - p1), abs(z2 - z1))
+                dist = max(abs(p2[0] - p1[0]), abs(p2[1] - p1[1]), abs(z2 - z1))
                 steps = int(np.ceil(dist * 1.5))  # 1.5x oversampling
 
                 for k in range(steps + 1):
                     t = k / steps if steps > 0 else 0
-                    curr_x = int(p1 + (p2 - p1) * t)
-                    curr_y = int(p1 + (p2 - p1) * t)
+                    curr_x = int(p1[0] + (p2[0] - p1[0]) * t)
+                    curr_y = int(p1[1] + (p2[1] - p1[1]) * t)
                     curr_z = int(z1 + (z2 - z1) * t)
 
-                    if (0 <= curr_x < self.img_size and
-                            0 <= curr_y < self.img_size and
+                    if (0 <= curr_x < self.img_size[1] and
+                            0 <= curr_y < self.img_size[0] and
                             0 <= curr_z < self.z_slices):
                         base_3d_image[curr_z, curr_y, curr_x] = 255
 
@@ -438,7 +438,7 @@ class SyntheticFilamentGenerator:
         if z_scale >= 1.0 or not self.is_3d:
             return volume
 
-        original_z = volume.shape
+        original_z = volume.shape[0]
         new_z = max(1, int(original_z * z_scale))
         sampled_volume = np.zeros((new_z, *volume.shape[1:]), dtype=volume.dtype)
 
@@ -577,30 +577,30 @@ class SyntheticFilamentGenerator:
                     p2 = points[j + 1]
                     z2 = z_coords[min(j + 1, len(z_coords) - 1)]
 
-                    dist = max(abs(p2 - p1), abs(p2 - p1), abs(z2 - z1))
+                    dist = max(abs(p2[0] - p1[0]), abs(p2[1] - p1[1]), abs(z2 - z1))
                     steps = int(np.ceil(dist * 1.5))
 
                     for k in range(steps + 1):
                         t = k / steps if steps > 0 else 0
-                        curr_x = int(p1 + (p2 - p1) * t)
-                        curr_y = int(p1 + (p2 - p1) * t)
+                        curr_x = int(p1[0] + (p2[0] - p1[0]) * t)
+                        curr_y = int(p1[1] + (p2[1] - p1[1]) * t)
                         curr_z = int(z1 + (z2 - z1) * t)
 
-                        if (0 <= curr_x < self.img_size and
-                                0 <= curr_y < self.img_size and
+                        if (0 <= curr_x < self.img_size[1] and
+                                0 <= curr_y < self.img_size[0] and
                                 0 <= curr_z < self.z_slices):
                             base_img[curr_z, curr_y, curr_x] = 255
 
             elif self.is_3d:  # Compatible with old parameters
                 z = int(z_layer)
                 for point in points:
-                    if (0 <= point < self.img_size and
-                            0 <= point < self.img_size and
+                    if (0 <= point[1] < self.img_size[0] and
+                            0 <= point[0] < self.img_size[1] and
                             0 <= z < self.z_slices):
-                        base_img[z, point, point] = 255
+                        base_img[z, point[1], point[0]] = 255
             else:  # 2D
-                valid_mask = (points[:, 0] >= 0) & (points[:, 0] < self.img_size) & \
-                             (points[:, 1] >= 0) & (points[:, 1] < self.img_size)
+                valid_mask = (points[:, 0] >= 0) & (points[:, 0] < self.img_size[1]) & \
+                             (points[:, 1] >= 0) & (points[:, 1] < self.img_size[0])
                 pts = points[valid_mask]
                 base_img[pts[:, 1], pts[:, 0]] = 255
 
@@ -643,11 +643,14 @@ class SyntheticFilamentGenerator:
 
 # Example usage
 if __name__ == "__main__":
+    synthetic_2d_dir = os.path.join("synthetic_output", "synthetic_2d")
+    synthetic_3d_dir = os.path.join("synthetic_output", "synthetic_3d", "zscale_1.0")
+
     # 1. Generate synthetic images (2D)
     print("Generating 2D synthetic images...")
     gen_2d = SyntheticFilamentGenerator(img_size=(512, 512), z_slices=0)
     gen_2d.batch_generate(
-        output_dir=,
+        output_dir=synthetic_2d_dir,
         num_images=20,
         num_filaments=20,
         crossing_prob=0.4,
@@ -662,8 +665,8 @@ if __name__ == "__main__":
 
     # 2. Batch reproduce images (2D) - must use batch_reproduce_from_npy
     print("\nBatch reproducing images...")
-    npy_path =
-    output_dir =
+    npy_path = os.path.join(synthetic_2d_dir, "all_parameters.npy")
+    output_dir = os.path.join("synthetic_output", "reproduced_2d", "standard")
     if os.path.exists(npy_path):
         gen_2d.batch_reproduce_from_npy(npy_path, output_dir,
                                         override_kernel_size=1, override_sigma=1,
@@ -674,7 +677,7 @@ if __name__ == "__main__":
     print("\nGenerating 3D synthetic stack (Base/Standard)...")
     gen_3d = SyntheticFilamentGenerator(img_size=(512, 512), z_slices=64)
     gen_3d.batch_generate(
-        output_dir=",
+        output_dir=synthetic_3d_dir,
         num_images=20,
         num_filaments=20,
         crossing_prob=0.4,
@@ -689,8 +692,8 @@ if __name__ == "__main__":
         z_scale=1.0
     )
 
-    npy_path =
-    base_output_dir =
+    npy_path = os.path.join(synthetic_3d_dir, "all_parameters.npy")
+    base_output_dir = os.path.join("synthetic_output", "reproduced_3d")
 
     if os.path.exists(npy_path):
         # 4. Anisotropy stress test
@@ -759,7 +762,7 @@ if __name__ == "__main__":
     # 7. Structural complexity stress test
     print("\nStructural complexity stress test...")
     # Modification suggestion: Range starts from 20 to align with baseline
-    num_filaments_range = []
+    num_filaments_range = [20, 70, 120, 170, 220, 270, 320, 370, 420]
 
     fixed_params = {
         'curvature_range': (0.1, 0.2),

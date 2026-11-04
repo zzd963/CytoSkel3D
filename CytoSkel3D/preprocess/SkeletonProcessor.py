@@ -79,7 +79,7 @@ class SkeletonProcessor:
     def post_process(self, skeleton_data: tuple, orig_data: np.ndarray) -> tuple:
         """Optimized post-processing - entirely based on binary skeleton"""
         if self.compute_labeled_skeleton:
-            binary_skeleton, relabeled_binary, relabeled_skeleton, pixel_class = skeleton_data
+            binary_skeleton, pixel_class, relabeled_binary, relabeled_skeleton = skeleton_data
         else:
             binary_skeleton, pixel_class = skeleton_data
 
@@ -213,7 +213,7 @@ class SkeletonProcessor:
 
             # Case 1: Single-pixel branch
             if num_pixels == 1:
-                coord = tuple(coords)
+                coord = tuple(coords[0])
                 connected_regions = self._get_connected_branch_regions(coord, branch_labels, binary_skeleton.shape)
                 is_critical = len(connected_regions) >= 2
 
@@ -233,8 +233,8 @@ class SkeletonProcessor:
                         endpoint_regions.append(connected_regions)
 
                     # Critical connection judgment
-                    is_critical = (endpoint_regions and endpoint_regions and
-                                   not endpoint_regions.intersection(endpoint_regions))
+                    is_critical = (endpoint_regions[0] and endpoint_regions[1] and
+                                   not endpoint_regions[0].intersection(endpoint_regions[1]))
 
             # Delete short non-critical branches
             if num_pixels < min_length and not is_critical:
@@ -332,7 +332,7 @@ class SkeletonProcessor:
 
             # Use np.where to find global maximum coordinates
             max_coords = np.where(orig_data == max_val)
-            if not max_coords or len(max_coords) == 0:
+            if not max_coords or len(max_coords[0]) == 0:
                 continue
 
             # Convert to coordinate list

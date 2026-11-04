@@ -63,24 +63,9 @@ class SegmentFeatureCalculator:
 
     def _identify_segments(self):
         """Identify all segments (edge fragments) and add segment index"""
-        segments = []
-        segment_id = 0
-
-        # Iterate through all edges and their segments
-        for edge_key, properties_list in self.extractor.edge_properties.items():
-            for prop_idx, props in enumerate(properties_list):
-                if 'path' in props and len(props['path']) > 1:
-                    # Create an enhanced edge_key containing the segment index
-                    enhanced_key = (edge_key[0], edge_key[1], prop_idx)
-
-                    segments.append({
-                        'id': segment_id,
-                        'edge_key': enhanced_key,  # Use enhanced key
-                        'props': props,
-                        'path': props['path']
-                    })
-                    segment_id += 1
-        return segments
+        # Use the same segment identities as the node and branch mappings.
+        self.extractor.build_mappings()
+        return list(self.extractor.segment_records)
 
     def _calculate_segment_morphology(self, segments):
         """Calculate segment morphological features (physical attributes)"""
@@ -217,26 +202,27 @@ class SegmentFeatureCalculator:
             'UpperQuartileIntensity': [],
             'Location_CenterMassIntensity_um': [],
             'Location_MaxIntensity_um': [],
-            'capacity': []    # Transmission capacity = average intensity / segment length, quantifies fluorescence signal intensity per unit length of filament.
+            'SkewnessIntensity': [],
+            'KurtosisIntensity': [],
+            'capacity': []
         }
 
         for segment in segments:
             path = segment['path']
-            props = segment['props']  # Use props dictionary directly
+            props = segment['props']
 
-            # Use unified method to calculate intensity features
+            # Use the shared intensity calculation and store the base features.
             features = self.extractor._compute_unified_intensity_features(path)
 
-            # Store all base features
             for key in intensity_data.keys():
-                if key != 'capacity':  # Handle capacity separately
+                if key != 'capacity':
                     intensity_data[key].append(features.get(key, np.nan))
 
-            # Handle capacity feature separately
-            capacity = props.get('capacity', np.nan)
+            length = self.extractor._calculate_physical_path_length(path)
+            # Capacity is integrated intensity per unit path length.
+            capacity = features['IntegratedIntensity'] / max(length, 1e-6)
             intensity_data['capacity'].append(capacity)
 
-            # Store full feature set in segment properties
             segment['intensity_features'] = features
 
         return intensity_data
@@ -351,45 +337,40 @@ class SegmentFeatureCalculator:
             p1 = phys_path[i]
             p2 = phys_path[i + 1]
 
-            # Adjust coordinates based on dimension
             if self.extractor.is_3d:
-                # 3D: Use full coordinates
                 v1 = p1 - p0
                 v2 = p2 - p1
             else:
-                # 2D: Take only y and x components
-                if len(p0) == 3:  # (z,y,x) format
+                if len(p0) == 3:
                     p0 = p0[1:]
                     p1 = p1[1:]
                     p2 = p2[1:]
                 v1 = p1 - p0
                 v2 = p2 - p1
 
-            # Calculate chord length (distance from p0 to p2)
+            # Calculate the chord length and the other two sides of the triangle.
             chord = np.linalg.norm(p2 - p0)
-            if chord < 1e-6:
+            side_a, side_b = np.linalg.norm(v1), np.linalg.norm(v2)
+            if chord == 0 or side_a == 0 or side_b == 0:
                 continue
 
-            # Calculate triangle area (using cross product)
             if self.extractor.is_3d:
+                # Calculate triangle area from the cross product.
                 cross = np.cross(v1, v2)
                 area = np.linalg.norm(cross) / 2.0
             else:
-                # 2D cross product is a scalar
                 area = abs(v1[0] * v2[1] - v1[1] * v2[0]) / 2.0
 
-            # Curvature = 4 * area / (chord length ^ 3)
-            curvature = 4 * area / (chord ** 3) if chord > 0 else np.nan
+            # Menger curvature uses the product of the three side lengths.
+            curvature = 4 * area / (side_a * side_b * chord)
 
-            # Determine sign (in 2D, the sign of the cross product indicates direction)
             if self.extractor.is_3d:
-                # In 3D, we use the projection on the XY plane to determine the sign
-                v1_xy = v1[1:3]  # Take y,x components
+                # Determine the sign of 3D curvature from its XY projection.
+                v1_xy = v1[1:3]
                 v2_xy = v2[1:3]
                 cross_z = v1_xy[0] * v2_xy[1] - v1_xy[1] * v2_xy[0]
                 sign = np.sign(cross_z)
             else:
-                # 2D directly takes the sign of the cross product
                 cross_z = v1[0] * v2[1] - v1[1] * v2[0]
                 sign = np.sign(cross_z)
 

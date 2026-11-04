@@ -158,7 +158,7 @@ class RidgeEnhancer:
         if self.is_3d:
             # Process 3D image layer by layer
             enhanced = np.zeros_like(image)
-            for z in range(image.shape):
+            for z in range(image.shape[0]):
                 layer = image[z]
                 H = hessian_matrix(layer, sigma=sigma)
                 _, lambda2 = hessian_matrix_eigvals(H)
@@ -175,7 +175,7 @@ class RidgeEnhancer:
     def _multi_orient_skel(self, image: np.ndarray) -> np.ndarray:
         """Improved multi-orientation skeleton generation method"""
         # Get parameters, defaulting to 6 orientations (0°, 30°, 60°, 90°, 120°, 150°)
-        angles = self.method_params.get('angles',)
+        angles = self.method_params.get("angles", [0, 30, 60, 90, 120, 150])
 
         # Get sigma values
         sigmas = self._get_sigmas()
@@ -192,7 +192,7 @@ class RidgeEnhancer:
             if self.is_3d:
                 angle_response = np.zeros_like(image, dtype=np.float32)
 
-                for z in range(image.shape):
+                for z in range(image.shape[0]):
                     # Get current layer
                     layer = image[z]
 
@@ -217,8 +217,8 @@ class RidgeEnhancer:
                     # Crop to original size
                     if layer_response.shape != layer.shape:
                         # Calculate padding amount
-                        dy = layer.shape - layer_response.shape
-                        dx = layer.shape - layer_response.shape
+                        dy = layer.shape[0] - layer_response.shape[0]
+                        dx = layer.shape[1] - layer_response.shape[1]
 
                         # Pad only when necessary
                         if dy > 0 or dx > 0:
@@ -236,7 +236,7 @@ class RidgeEnhancer:
                             )
 
                         # Crop excess parts (if any)
-                        layer_response = layer_response[:layer.shape, :layer.shape]
+                        layer_response = layer_response[:layer.shape[0], :layer.shape[1]]
 
                     # Store response of current layer
                     angle_response[z] = layer_response
@@ -262,8 +262,8 @@ class RidgeEnhancer:
                 # Crop to original size
                 if angle_response.shape != image.shape:
                     # Calculate padding amount
-                    dy = image.shape - angle_response.shape
-                    dx = image.shape - angle_response.shape
+                    dy = image.shape[0] - angle_response.shape[0]
+                    dx = image.shape[1] - angle_response.shape[1]
 
                     # Pad only when necessary
                     if dy > 0 or dx > 0:
@@ -281,7 +281,7 @@ class RidgeEnhancer:
                         )
 
                     # Crop excess parts (if any)
-                    angle_response = angle_response[:image.shape, :image.shape]
+                    angle_response = angle_response[:image.shape[0], :image.shape[1]]
 
             # Accumulate responses from all orientations
             ridges += angle_response

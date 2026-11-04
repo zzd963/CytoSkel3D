@@ -54,8 +54,8 @@ class BinaryProcessor:
             image, conversion_dict = self._log_transform(image)
 
         # Handle case where all pixel values are the same
-        if np.all(image == image.flat):
-            threshold = image.flat
+        if np.all(image == image.flat[0]):
+            threshold = image.flat[0]
             if log_transform:
                 threshold = self._inverse_log_transform(threshold, conversion_dict)
             threshold = min(max(threshold, min_val), max_val)
@@ -69,9 +69,9 @@ class BinaryProcessor:
             thresholds = filters.threshold_multiotsu(image, classes=classes)
             # Choose whether middle value is foreground or background
             if assign_middle.casefold() == "foreground":
-                threshold = thresholds  # First threshold as foreground boundary
+                threshold = thresholds[0]  # First threshold as foreground boundary
             else:
-                threshold = thresholds  # Second threshold as foreground boundary
+                threshold = thresholds[1]  # Second threshold as foreground boundary
         elif method == 'minimum_cross_entropy':
             # Corresponds to Li's method in skimage
             threshold = filters.threshold_li(image)
@@ -111,29 +111,29 @@ class BinaryProcessor:
         if any(n < 2 for n in nblocks):
             raise ValueError(
                 f"Adaptive window size {window_size}px is too large "
-                f"to be used for {image_size}x{image_size} image"
+                f"to be used for {image_size[1]}x{image_size[0]} image"
             )
 
         # Calculate block size and position
         increment = np.array(image_size, dtype=float) / np.array(nblocks, dtype=float)
         threshold_map = np.zeros(image_size, dtype=float)
-        block_thresholds = np.zeros([nblocks, nblocks])
+        block_thresholds = np.zeros([nblocks[0], nblocks[1]])
 
         # Calculate threshold for each block
-        for i in range(nblocks):
-            i0 = int(i * increment)
-            i1 = int((i + 1) * increment)
-            for j in range(nblocks):
-                j0 = int(j * increment)
-                j1 = int((j + 1) * increment)
+        for i in range(nblocks[0]):
+            i0 = int(i * increment[0])
+            i1 = int((i + 1) * increment[0])
+            for j in range(nblocks[1]):
+                j0 = int(j * increment[1])
+                j1 = int((j + 1) * increment[1])
                 block = image[i0:i1, j0:j1]
 
                 # Skip empty blocks
                 if np.size(block) == 0:
                     block_threshold = 0
                 # Handle case where all pixel values are the same
-                elif np.all(block == block.flat):
-                    block_threshold = block.flat
+                elif np.all(block == block.flat[0]):
+                    block_threshold = block.flat[0]
                 # Handle special case for multi-Otsu method
                 elif method == 'multiotsu' and len(np.unique(block)) < 3:
                     block_threshold = filters.threshold_otsu(block)
@@ -144,21 +144,21 @@ class BinaryProcessor:
                     elif method == 'multiotsu':
                         classes = self.params.get('multiotsu_classes', 3)
                         thresholds = filters.threshold_multiotsu(block, classes=classes)
-                        block_threshold = thresholds if assign_middle.casefold() == "foreground" else thresholds
+                        block_threshold = thresholds[0] if assign_middle.casefold() == "foreground" else thresholds[1]
                     elif method == 'minimum_cross_entropy':
                         block_threshold = filters.threshold_li(block)
 
                 block_thresholds[i, j] = block_threshold
 
         # Smooth threshold map using bilinear interpolation
-        x_coords = np.arange(0, nblocks) * increment + increment / 2
-        y_coords = np.arange(0, nblocks) * increment + increment / 2
+        x_coords = np.arange(0, nblocks[1]) * increment[1] + increment[1] / 2
+        y_coords = np.arange(0, nblocks[0]) * increment[0] + increment[0] / 2
 
         from scipy.interpolate import RectBivariateSpline
         spline = RectBivariateSpline(y_coords, x_coords, block_thresholds)
 
-        y_points = np.arange(0, image_size)
-        x_points = np.arange(0, image_size)
+        y_points = np.arange(0, image_size[0])
+        x_points = np.arange(0, image_size[1])
         threshold_map = spline(y_points, x_points, grid=True)
 
         # Reverse logarithmic transformation
@@ -167,8 +167,8 @@ class BinaryProcessor:
 
         # Apply correction factor and global limits
         threshold_map *= correction_factor
-        t_min = max(min_val, global_threshold * global_limits)
-        t_max = min(max_val, global_threshold * global_limits)
+        t_min = max(min_val, global_threshold * global_limits[0])
+        t_max = min(max_val, global_threshold * global_limits[1])
         np.clip(threshold_map, t_min, t_max, out=threshold_map)
 
         return threshold_map
@@ -189,7 +189,7 @@ class BinaryProcessor:
             # Process 3D image layer by layer
             if image.ndim == 3:
                 adaptive_threshold = np.zeros_like(image, dtype=np.float32)
-                for z in range(image.shape):
+                for z in range(image.shape[0]):
                     adaptive_threshold[z] = self._get_adaptive_threshold(image[z])
                 binary = image > adaptive_threshold
             else:

@@ -474,8 +474,8 @@ class CytoskeletonNetworkAnalyzer:
                     intensities.append(self.raw_image[y, x])
             except (IndexError, ValueError):
                 continue
-        avg_intensity = np.mean(intensities) if intensities else 0
-        return avg_intensity / max(path_length, 1e-6)
+        total_intensity = np.sum(intensities) if intensities else 0
+        return total_intensity / max(path_length, 1e-6)
 
     def _to_physical_coordinates(self, input_data):
         if isinstance(input_data, (tuple, list, np.ndarray)) and not isinstance(input_data[0],

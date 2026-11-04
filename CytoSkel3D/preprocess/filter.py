@@ -449,8 +449,8 @@ class HybridCytoskeletonProcessor:
 
                             # Process 2D data dimensions
                             if not self.is_3d and isinstance(output_data, np.ndarray) and output_data.ndim == 3 and \
-                                    output_data.shape == 1:
-                                output_data = output_data
+                                    output_data.shape[0] == 1:
+                                output_data = output_data[0]
 
                             # Save based on data type
                             if key in ['im_pre_skeleton', 'im_pre_cleaned_skeleton']:
@@ -474,8 +474,8 @@ class HybridCytoskeletonProcessor:
                     print(f"Saving {step_name} to: {save_path}")
 
                     # Process 2D data dimensions
-                    if not self.is_3d and isinstance(data, np.ndarray) and data.ndim == 3 and data.shape == 1:
-                        data = data
+                    if not self.is_3d and isinstance(data, np.ndarray) and data.ndim == 3 and data.shape[0] == 1:
+                        data = data[0]
 
                     # Fix special handling for skeleton data
                     if pipeline_key in ['im_pre_binary']:
@@ -619,12 +619,12 @@ class HybridCytoskeletonProcessor:
                     # Special handling for skeleton step
                     if step == 'skeleton':
                         # Skeleton step uses binary skeleton (first element of tuple)
-                        display_data = data
+                        display_data = data[0]
 
                     # Special handling for post-processing step
                     elif step == 'post_processing':
                         # Post-processing step uses binary result (first element of tuple)
-                        display_data = data
+                        display_data = data[0]
 
                     # Other steps use data directly
                     else:
@@ -827,11 +827,13 @@ HYBRID_PARAMS = {
 
 if __name__ == "__main__":
     # Test cases - demonstrate new features
-    test_dir =
-    out_dir =
+    test_dir = "input"
+    out_dir = "output"
 
-    all_paths = [f for f in os.listdir(test_dir) if f.endswith(('.tiff', '.tif'))]
-    test_file = os.path.join(test_dir, all_paths)
+    all_paths = sorted(f for f in os.listdir(test_dir) if f.lower().endswith((".tiff", ".tif")))
+    if not all_paths:
+        raise FileNotFoundError(f"No TIFF files found in {test_dir}")
+    test_file = os.path.join(test_dir, all_paths[0])
 
     img_info = Img_Information(test_file, output_dir=out_dir)
     img_info.change_axes('ZYX')
