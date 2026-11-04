@@ -1,13 +1,13 @@
 ### CytoSkel3D: A Hierarchical Graph-Theoretical Framework for 3D Cytoskeletal Quantification
 ## Overview
-**CytoSkel3D** is a highly automated computational framework designed for the systematic quantification of complex three-dimensional (3D) cytoskeletal networks (e.g., actin, microtubules, and keratin). By overcoming the topological distortions inherent in traditional 2D projections, CytoSkel3D establishes a standardized dual-axis feature set that transforms raw volumetric data into 171 interpretable metrics across multiple structural scales and functional dimensions.
+**CytoSkel3D** is a highly automated computational framework designed for the systematic quantification of complex three-dimensional (3D) cytoskeletal networks (e.g., actin, microtubules, and keratin). By overcoming the topological distortions inherent in traditional 2D projections, CytoSkel3D establishes a standardized dual-axis feature set that transforms raw volumetric data into 170 interpretable metrics across multiple structural scales and functional dimensions.
 
 <img width="4119" height="3831" alt="Graphical abstract" src="https://github.com/user-attachments/assets/fc9c7257-b236-416b-8c2f-578b4d39e56c" />
 
 **Key Features**
 - **Topological Fidelity**: Implements adaptive extraction algorithms to ensure structural integrity across diverse imaging conditions.
 - **4+1 Hierarchical Modeling**: Decomposes cytoskeletal organization into four graph-based levels—Node, Segment, Branch, and Network—coupled with an integrated Cell level to capture global spatial context.
-- **Systematic Feature Set**: Extracts 171 standardized parameters organized by four functional dimensions: Morphology, Topology, Spatial Distribution, and Intensity.
+- **Systematic Feature Set**: Extracts 170 standardized parameters organized by four functional dimensions: Morphology, Topology, Spatial Distribution, and Intensity.
 - **Modular & Scalable Pipeline**: Features a decoupled architecture for high-throughput quantification across diverse biological systems.
 
 ## Repository Structure
@@ -30,7 +30,7 @@ CytoSkel3D/
 The project requires Python 3.8 and specific versions of networkx, scikit-image, and scipy. It is recommended to use Conda:
 ```Bash
 conda env create -f environment.yml
-conda activate cytoskel3d
+conda activate CytoSkel3D
 ```
 
 **2. Running the Demo**
@@ -39,6 +39,17 @@ Analyze hiPSC datasets to detect architectural signatures related to cellular po
 python Demo/download_hipsc.py
 python Demo/run_edge_nonedge.py 
 ```
+### Application data
+
+The Data/ directory contains the cell-level feature tables for the three applications in the revised manuscript.
+
+| File | Application and group labels |
+| --- | --- |
+| kernet_all_cell_features.csv | KerNet epithelial cell types (HaCaT, MDCK, and RPE), identified by the file_id prefix |
+| hipsc_edge_nonedge_all_cell_features_ACTB.csv and hipsc_edge_nonedge_all_cell_features_TUBA1B.csv | hiPSC colony position, with groups in location |
+| hipsc_mitosis_all_cell_features_ACTB.csv and hipsc_mitosis_all_cell_features_TUBA1B.csv | hiPSC early mitosis, with groups in cell_cycle |
+| five_fold_feature_ranking.xlsx | KerNet features selected and ranked in each of the five outer training folds (Note S8C) |
+
 ### Methodology
 **Preprocessing and Skeleton Extraction**: Adaptive SNR-driven filtering and ridge-based tubular enhancement ensure robust skeleton extraction.
 
