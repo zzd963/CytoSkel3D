@@ -34,11 +34,24 @@ conda activate CytoSkel3D
 ```
 
 **2. Running the Demo**
-Analyze hiPSC datasets to detect architectural signatures related to cellular polarity:
+Analyze hiPSC datasets to detect architectural signatures related to cellular polarity. Run the commands below from the repository root.
+
+To download the Allen Institute data, check the destination paths in `Demo/download_hipsc.py` and run:
 ```Bash
 python Demo/download_hipsc.py
-python Demo/run_edge_nonedge.py 
 ```
+
+Prepare the channel-separated TIFFs under `AICS_hipsc_cytoskel/`. Each cohort folder (`hipsc_single_edge_cell` and `hipsc_single_nonedge_cell`) should contain `metadata.csv` and these files, using the `CellId` and `structure_name` values from the metadata:
+
+- `crop_raw/<structure>/<cell_id>_c2_raw.tif`
+- `crop_seg/<structure>/<cell_id>_c2_seg.tif`
+- `crop_seg/<structure>/<cell_id>_c4_seg.tif` (optional)
+
+Check that `output_path` in `Demo/run_edge_nonedge.py` points to a writable directory, then run:
+```Bash
+python -m Demo.run_edge_nonedge
+```
+
 ### Application data
 
 The Data/ directory contains the cell-level feature tables for the three applications in the revised manuscript.
