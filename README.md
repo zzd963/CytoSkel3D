@@ -1,13 +1,13 @@
 ### CytoSkel3D: A Hierarchical Graph-Theoretical Framework for 3D Cytoskeletal Quantification
 ## Overview
-**CytoSkel3D** is a highly automated computational framework designed for the systematic quantification of complex three-dimensional (3D) cytoskeletal networks (e.g., actin, microtubules, and keratin). By overcoming the topological distortions inherent in traditional 2D projections, CytoSkel3D establishes a standardized dual-axis feature set that transforms raw volumetric data into 170 interpretable metrics across multiple structural scales and functional dimensions.
+**CytoSkel3D** is a highly automated computational framework designed for the systematic quantification of complex three-dimensional (3D) cytoskeletal networks (e.g., actin, microtubules, and keratin). CytoSkel3D analyzes native 3D images through skeleton extraction, hierarchical graph modeling, and a standardized dual-axis feature module with 170 descriptors organized by structural level and feature dimension.
 
 <img width="4119" height="3831" alt="Graphical abstract" src="https://github.com/user-attachments/assets/fc9c7257-b236-416b-8c2f-578b4d39e56c" />
 
 **Key Features**
-- **Topological Fidelity**: Implements adaptive extraction algorithms to ensure structural integrity across diverse imaging conditions.
+- **Connection-aware Skeleton Extraction**: Combines established thinning algorithms with a connection-protection rule designed to limit connectivity disruption during pruning.
 - **4+1 Hierarchical Modeling**: Decomposes cytoskeletal organization into four graph-based levels—Node, Segment, Branch, and Network—coupled with an integrated Cell level to capture global spatial context.
-- **Systematic Feature Set**: Extracts 170 standardized parameters organized by four functional dimensions: Morphology, Topology, Spatial Distribution, and Intensity.
+- **Systematic Feature Set**: Extracts 170 standardized parameters organized by four feature dimensions: Morphology, Topology, Spatial Distribution, and Intensity.
 - **Modular & Scalable Pipeline**: Features a decoupled architecture for high-throughput quantification across diverse biological systems.
 
 ## Repository Structure
@@ -22,6 +22,7 @@ CytoSkel3D/
 │   │   └── ...               # Sub-modules for Node, Segment, Branch, and Cell levels
 │   └── synthetic/            # Synthetic data generation for benchmarking
 ├── Demo/                     # Application scripts and use cases
+├── Data/                     # Per-cell feature tables and supporting analysis results
 ├── environment.yml           # Conda environment configuration
 └── README.md
 ```
@@ -52,29 +53,38 @@ Check that `output_path` in `Demo/run_edge_nonedge.py` points to a writable dire
 python -m Demo.run_edge_nonedge
 ```
 
-### Application data
+### Application feature tables
 
-The Data/ directory contains the cell-level feature tables for the three applications in the revised manuscript.
+The per-cell feature tables for the three applications in the revised manuscript are available in `Data/`.
 
 | File | Application and group labels |
 | --- | --- |
-| kernet_all_cell_features.csv | KerNet epithelial cell types (HaCaT, MDCK, and RPE), identified by the file_id prefix |
-| hipsc_edge_nonedge_all_cell_features_ACTB.csv and hipsc_edge_nonedge_all_cell_features_TUBA1B.csv | hiPSC colony position, with groups in location |
-| hipsc_mitosis_all_cell_features_ACTB.csv and hipsc_mitosis_all_cell_features_TUBA1B.csv | hiPSC early mitosis, with groups in cell_cycle |
-| five_fold_feature_ranking.xlsx | KerNet features selected and ranked in each of the five outer training folds (Note S8C) |
+| [kernet_all_cell_features.csv](Data/kernet_all_cell_features.csv) | KerNet epithelial cell types (HaCaT, MDCK, and RPE), identified by the `file_id` prefix |
+| [hipsc_edge_nonedge_all_cell_features_ACTB.csv](Data/hipsc_edge_nonedge_all_cell_features_ACTB.csv) and [hipsc_edge_nonedge_all_cell_features_TUBA1B.csv](Data/hipsc_edge_nonedge_all_cell_features_TUBA1B.csv) | hiPSC colony position, with groups in `location` |
+| [hipsc_mitosis_all_cell_features_ACTB.csv](Data/hipsc_mitosis_all_cell_features_ACTB.csv) and [hipsc_mitosis_all_cell_features_TUBA1B.csv](Data/hipsc_mitosis_all_cell_features_TUBA1B.csv) | hiPSC early mitosis, with groups in `cell_cycle` |
+
+### KerNet validation and ablation results
+
+To keep the supplementary document concise, these detailed KerNet tables are provided separately in this repository as online supporting results. See supplementary Note S8C for the KerNet feature-selection procedure and Note S7 for the structural hierarchy and feature dimension ablation framework.
+
+| File | Contents |
+| --- | --- |
+| [five_fold_feature_ranking.xlsx](Data/five_fold_feature_ranking.xlsx) | Features selected in each of the five outer training folds, with fold-specific ranks and RF importance values. The selected feature sets and rankings vary across folds. |
+| [KerNet_hierarchy_ablation.xlsx](Data/KerNet_hierarchy_ablation.xlsx) | KerNet comparisons using single structural levels and combinations of levels, reporting five-fold mean AUC and accuracy (ACC) for the three-class and pairwise cell-type comparisons. |
+| [KerNet_feature_type_ablation.xlsx](Data/KerNet_feature_type_ablation.xlsx) | KerNet comparisons using individual feature types and all types together, reporting five-fold mean AUC and accuracy (ACC) for the same comparisons. |
 
 ### Methodology
-**Preprocessing and Skeleton Extraction**: Adaptive SNR-driven filtering and ridge-based tubular enhancement ensure robust skeleton extraction.
+**Preprocessing and Skeleton Extraction**: Configurable denoising, ridge enhancement, thresholding, thinning, and pruning extract image skeletons. A connection-protection rule helps limit connectivity disruption during pruning.
 
-**Topology Reconstruction**: A super-node mechanism consolidates fragmented junctions, followed by angle-guided optimization to ensure biological plausibility.
+**Topology Reconstruction**: A super-node mechanism consolidates fragmented junctions, with optional angle-guided optimization based on local segment alignment.
 
 **Feature Extraction**:
 
 - **Node**: Junction connectivity and spatial positioning.
 - **Segment**: Micro-filament geometry (curvature, tortuosity) and 3D orientation.
 - **Branch**: Topological complexity of interconnected assemblies.
-- **Network**: Global graph properties including small-world metrics and connectivity.
-- **Cell**: Whole-cell spatial heterogeneity and polarity independent of cell shape.
+- **Network**: Graph connectivity and path-based measures, including global efficiency.
+- **Cell**: Whole-cell morphology, spatial heterogeneity, and fluorescence intensity distributions.
 
 ### Citation
 If you use CytoSkel3D in your research, please cite:
