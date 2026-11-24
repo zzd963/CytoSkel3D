@@ -93,13 +93,12 @@ class NetworkReconstructor:
                     seg1, seg2 = best_pair['seg1'], best_pair['seg2']
 
                     # Confirm again that the segments have not been removed
-                    if seg1 in current_segments and seg2 in current_segments:
+                    if any(s is seg1 for s in current_segments) and any(s is seg2 for s in current_segments):
                         # Execute merge
                         merged_segment = self._merge_segments_at_node(seg1, seg2, best_pair['super_node'])
 
                         # Update lists
-                        current_segments.remove(seg1)
-                        current_segments.remove(seg2)
+                        current_segments = [s for s in current_segments if s is not seg1 and s is not seg2]
                         current_segments.append(merged_segment)
 
                         changed = True
@@ -452,6 +451,10 @@ class NetworkReconstructor:
                     dist_map[v] = alt
                     prev[v] = u
                     heapq.heappush(queue, (alt, v))
+        # An unreachable endpoint alone is not a valid shortest path.
+        # Use the existing endpoint fallback with the same acceptance criteria and search neighborhood.
+        if not np.isfinite(dist_map[end_node]):
+            return np.array([start_node, end_node])
         path = []
         u = end_node
         while u is not None:

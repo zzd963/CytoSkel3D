@@ -358,6 +358,9 @@ class CytoskeletonNetworkAnalyzer:
                         prev[v] = u
                         heapq.heappush(queue, (alt, v))
 
+            if not np.isfinite(dist[end_idx]):
+                return points
+
             path_indices = []
             u = end_idx
             while u != -1:
@@ -383,6 +386,11 @@ class CytoskeletonNetworkAnalyzer:
             node_positions.add(tuple(seg['start_point']))
             node_positions.add(tuple(seg['end_point']))
 
+        path_positions = {tuple(point) for seg in segments for point in seg.get('path', [])}
+        for node in nodes:
+            if node[-1] == 'super_branchpoint' and tuple(node[:-1]) in path_positions:
+                node_positions.add(tuple(node[:-1]))
+
         for point in node_positions:
             point_tuple = tuple(point)
             if point_tuple not in node_id_map:
@@ -396,7 +404,21 @@ class CytoskeletonNetworkAnalyzer:
                 next_node_id += 1
 
         for seg in segments:
-            self._add_single_edge(seg, node_id_map)
+            # Angle-guided merging changes filament paths, but shared endpoints remain graph nodes.
+            # Split only at existing graph nodes on the path. Geometric proximity alone creates no edge.
+            path = np.asarray(seg.get('path', []))
+            if len(path) == 0:
+                continue
+            cuts = [0] + [i for i in range(1, len(path) - 1)
+                          if tuple(path[i]) in node_id_map] + [len(path) - 1]
+            for first, last in zip(cuts[:-1], cuts[1:]):
+                if first == last and len(path) > 1:
+                    continue
+                part = seg.copy()
+                part['path'] = path[first:last + 1]
+                part['start_point'] = tuple(path[first])
+                part['end_point'] = tuple(path[last])
+                self._add_single_edge(part, node_id_map)
 
     def _build_2d_network(self, segments, nodes):
         """Build 2D network"""
